@@ -1,6 +1,15 @@
-version: '3.8'
-
 services:
+  firestore-emulator:
+    image: andreysenov/firebase-tools:latest
+    ports:
+      - "8081:8081"
+      - "9099:9099"
+      - "4000:4000"
+    volumes:
+      - ./infra/firebase:/home/node
+    working_dir: /home/node
+    command: firebase emulators:start --only firestore,auth,ui --project quiz-app-dev
+
   backend:
     build:
       context: ./backend
@@ -10,13 +19,15 @@ services:
     environment:
       - PORT=8080
       - FIREBASE_PROJECT_ID=quiz-app-dev
+      - FIRESTORE_EMULATOR_HOST=firestore-emulator:8081
+      - FIREBASE_AUTH_EMULATOR_HOST=firestore-emulator:9099
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
     volumes:
       - ./backend:/app
-# depends_on:
-      # - firestore-emulator
+    depends_on:
+      - firestore-emulator
 
   frontend:
     build:

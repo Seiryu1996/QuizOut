@@ -95,7 +95,9 @@ func main() {
 	// AI Service 初期化
 	aiService, err := service.NewAIService(cfg)
 	if err != nil {
-		log.Fatalf("Failed to initialize AI service: %v", err)
+		log.Printf("Failed to initialize AI service: %v", err)
+		// テスト環境では続行
+		aiService = nil
 	}
 
 	// UseCase 初期化

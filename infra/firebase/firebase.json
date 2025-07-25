@@ -1,4 +1,7 @@
 {
+  "projects": {
+    "default": "quiz-app-dev"
+  },
   "emulators": {
     "auth": {
       "port": 9099
