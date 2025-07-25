@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"quiz-app/internal/domain"
 
-	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
 )
 

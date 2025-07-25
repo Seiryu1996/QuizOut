@@ -133,13 +133,13 @@ func (u *quizUseCase) SubmitAnswer(ctx context.Context, sessionID, userID, quest
 	}
 
 	// 問題確認
-	question, err := u.questionRepo.GetByID(ctx, sessionID, questionID)
+	question, err := u.questionRepo.GetByID(ctx, questionID)
 	if err != nil {
 		return nil, domain.ErrQuestionNotFound
 	}
 
 	// 既に回答済みかチェック
-	existingAnswer, err := u.answerRepo.GetByUserAndQuestion(ctx, sessionID, userID, questionID)
+	existingAnswer, err := u.answerRepo.GetByUserAndQuestion(ctx, userID, questionID)
 	if err == nil && existingAnswer != nil {
 		return existingAnswer, nil
 	}
@@ -180,7 +180,7 @@ func (u *quizUseCase) ProcessRoundResults(ctx context.Context, sessionID string,
 	}
 
 	// 問題確認
-	question, err := u.questionRepo.GetByID(ctx, sessionID, questionID)
+	question, err := u.questionRepo.GetByID(ctx, questionID)
 	if err != nil {
 		return nil, nil, domain.ErrQuestionNotFound
 	}
@@ -196,7 +196,7 @@ func (u *quizUseCase) ProcessRoundResults(ctx context.Context, sessionID string,
 
 	// 各参加者の回答をチェック
 	for _, participant := range activeParticipants {
-		answer, err := u.answerRepo.GetByUserAndQuestion(ctx, sessionID, participant.UserID, questionID)
+		answer, err := u.answerRepo.GetByUserAndQuestion(ctx, participant.UserID, questionID)
 		
 		if err != nil || !answer.IsCorrect {
 			// 不正解または無回答の場合は脱落

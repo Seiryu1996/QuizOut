@@ -5,7 +5,6 @@ import (
 	"quiz-app/internal/middleware"
 	"quiz-app/internal/usecase"
 	"quiz-app/pkg/utils"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,14 +19,6 @@ func NewSessionHandler(sessionUseCase usecase.SessionUseCase, userUseCase usecas
 		sessionUseCase: sessionUseCase,
 		userUseCase:    userUseCase,
 	}
-}
-
-type CreateSessionRequest struct {
-	Title           string `json:"title" binding:"required"`
-	MaxParticipants int    `json:"maxParticipants"`
-	TimeLimit       int    `json:"timeLimit"`
-	RevivalEnabled  bool   `json:"revivalEnabled"`
-	RevivalCount    int    `json:"revivalCount"`
 }
 
 type JoinSessionRequest struct {
@@ -101,10 +92,10 @@ func (h *SessionHandler) JoinSession(c *gin.Context) {
 	}
 
 	// ユーザー作成または取得
-	user, err := h.userUseCase.GetUser(c.Request.Context(), userID)
+	_, err := h.userUseCase.GetUser(c.Request.Context(), userID)
 	if err != nil {
 		// ユーザーが存在しない場合は作成
-		user, err = h.userUseCase.CreateUser(c.Request.Context(), req.DisplayName, "", true)
+		_, err = h.userUseCase.CreateUser(c.Request.Context(), req.DisplayName, "", true)
 		if err != nil {
 			utils.InternalServerError(c, "Failed to create user")
 			return

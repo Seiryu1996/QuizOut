@@ -3,10 +3,8 @@ package handler
 import (
 	"net/http"
 	"quiz-app/internal/domain"
-	"quiz-app/internal/middleware"
 	"quiz-app/internal/usecase"
 	"quiz-app/pkg/utils"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )

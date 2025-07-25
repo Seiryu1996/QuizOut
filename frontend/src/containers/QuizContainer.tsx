@@ -12,7 +12,7 @@ import { QuizPresenter } from './QuizPresenter';
 export const QuizContainer: React.FC = () => {
   const params = useParams();
   const router = useRouter();
-  const sessionId = params.id as string;
+  const sessionId = params?.id as string;
 
   const { isAuthenticated, user, loading: authLoading } = useAuth();
   const { displayName } = useUserStore();

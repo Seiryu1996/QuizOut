@@ -2,12 +2,12 @@ FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
-# Go modulesファイルをコピー
-COPY go.mod go.sum ./
-RUN go mod download
-
 # ソースコードをコピー
 COPY . .
+
+# Go modulesを更新
+RUN go mod tidy
+RUN go mod download
 
 # アプリケーションをビルド
 RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/server

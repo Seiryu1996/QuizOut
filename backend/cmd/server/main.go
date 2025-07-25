@@ -17,10 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"cloud.google.com/go/firestore"
-	firebase "firebase.google.com/go/v4"
 	"github.com/gin-gonic/gin"
-	"google.golang.org/api/option"
 )
 
 func main() {

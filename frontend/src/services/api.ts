@@ -24,13 +24,13 @@ class APIClient {
     const url = `${this.baseURL}${endpoint}`;
     const token = this.getAuthToken();
     
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...(options.headers as Record<string, string> || {}),
     };
 
     if (token) {
-      headers.Authorization = `Bearer ${token}`;
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     try {
@@ -182,10 +182,10 @@ class APIClient {
 
   async exportResults(sessionId: string): Promise<Blob | null> {
     const token = this.getAuthToken();
-    const headers: HeadersInit = {};
+    const headers: Record<string, string> = {};
     
     if (token) {
-      headers.Authorization = `Bearer ${token}`;
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     try {

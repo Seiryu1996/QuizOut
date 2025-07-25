@@ -242,14 +242,7 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
     };
   }, [autoConnect, authToken, connect, disconnect]);
 
-  // タイマー管理
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeRemaining(prev => Math.max(0, prev - 1));
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [setTimeRemaining]);
+  // タイマー管理は親コンポーネントで行う
 
   return {
     isConnected,
