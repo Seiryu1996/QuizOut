@@ -18,20 +18,21 @@ export const db = getFirestore(app);
 
 // 開発環境でエミュレータに接続
 if (process.env.NODE_ENV === 'development') {
-  try {
-    // Auth エミュレータに接続
-    connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
-    console.log('Firebase Auth emulator connected');
-  } catch (error) {
-    console.log('Firebase Auth emulator already connected or failed to connect:', error);
-  }
-  
-  try {
-    // Firestore エミュレータに接続
-    connectFirestoreEmulator(db, 'localhost', 8081);
-    console.log('Firestore emulator connected');
-  } catch (error) {
-    console.log('Firestore emulator already connected or failed to connect:', error);
+  // ブラウザサイドでのみエミュレータに接続（サーバーサイドでは不要）
+  if (typeof window !== 'undefined') {
+    try {
+      connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
+      console.log('Firebase Auth emulator connected to: http://localhost:9099');
+    } catch (error) {
+      console.log('Firebase Auth emulator already connected:', error);
+    }
+    
+    try {
+      connectFirestoreEmulator(db, 'localhost', 8081);
+      console.log('Firestore emulator connected to: localhost:8081');
+    } catch (error) {
+      console.log('Firestore emulator already connected:', error);
+    }
   }
 }
 

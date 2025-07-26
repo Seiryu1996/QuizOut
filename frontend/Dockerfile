@@ -13,6 +13,3 @@ COPY . .
 
 # ポートを公開
 EXPOSE 3000
-
-# 開発サーバーを起動
-CMD ["npm", "run", "dev"]

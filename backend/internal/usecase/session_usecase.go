@@ -135,7 +135,7 @@ func (u *sessionUseCase) JoinSession(ctx context.Context, sessionID, userID, dis
 	user, err := u.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		// ユーザーが存在しない場合は匿名ユーザーとして作成
-		user = domain.NewUser(displayName, "", true)
+		user = domain.NewUserWithEmail(displayName, "", true)
 		user.ID = userID
 		if err := u.userRepo.Create(ctx, user); err != nil {
 			return nil, fmt.Errorf("failed to create user: %w", err)

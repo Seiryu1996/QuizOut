@@ -15,10 +15,20 @@ type SessionRepository interface {
 
 type UserRepository interface {
 	Create(ctx context.Context, user *domain.User) error
+	CreateWithPassword(ctx context.Context, user *domain.User, password string) error
 	GetByID(ctx context.Context, id string) (*domain.User, error)
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
+	GetByUsername(ctx context.Context, username string) (*domain.User, error)
+	ValidateUserCredentials(ctx context.Context, username, password string) (*domain.User, error)
 	Update(ctx context.Context, user *domain.User) error
 	Delete(ctx context.Context, id string) error
+	BulkCreateUsers(ctx context.Context, users []UserCredentials) error
+}
+
+type UserCredentials struct {
+	Username    string `json:"username" binding:"required"`
+	Password    string `json:"password" binding:"required"`
+	DisplayName string `json:"displayName" binding:"required"`
 }
 
 type ParticipantRepository interface {

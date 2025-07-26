@@ -1,30 +1,36 @@
-FROM golang:1.21-alpine AS builder
+FROM golang:1.21-alpine AS base
+
+# 開発に必要なツールをインストール
+RUN apk add --no-cache git ca-certificates
 
 WORKDIR /app
 
-# ソースコードをコピー
-COPY . .
-
-# Go modulesを更新
-RUN go mod tidy
+# go.modとgo.sumをコピーしてdependenciesをインストール
+COPY go.mod go.sum ./
 RUN go mod download
 
+# 開発用ステージ
+FROM base AS development
+# airをインストール（ホットリロード用）
+RUN go install github.com/cosmtrek/air@v1.49.0
+EXPOSE 8080
+CMD ["air"]
+
+# プロダクション用ステージ
+FROM base AS production
+# ソースコードをコピー
+COPY . .
 # アプリケーションをビルド
 RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/server
 
 # 実行用の軽量イメージ
-FROM alpine:latest
-
-# セキュリティアップデートとca-certificatesをインストール
+FROM alpine:latest AS runtime
 RUN apk --no-cache add ca-certificates
-
-WORKDIR /root/
-
-# バイナリをコピー
-COPY --from=builder /app/main .
-
-# ポートを公開
+WORKDIR /app
+COPY --from=production /app/main .
+COPY --from=production /app/configs ./configs
 EXPOSE 8080
+CMD ["/app/main"]
 
-# アプリケーションを実行
-CMD ["./main"]
+# デフォルトは開発用
+FROM development

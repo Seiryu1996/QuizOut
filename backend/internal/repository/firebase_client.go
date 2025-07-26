@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"os"
 	"quiz-app/internal/domain"
 	"quiz-app/pkg/config"
 
@@ -27,7 +28,15 @@ func NewFirebaseClient(ctx context.Context, cfg *config.Config) (*FirebaseClient
 	var app *firebase.App
 	var err error
 
-	if cfg.Firebase.PrivateKey != "" {
+	// 開発環境でエミュレータを使用する場合の設定
+	if os.Getenv("FIREBASE_AUTH_EMULATOR_HOST") != "" {
+		// Firebase Auth Emulator用の設定
+		firebaseConfig := &firebase.Config{
+			ProjectID: cfg.Firebase.ProjectID,
+		}
+		// エミュレータを使用する場合は認証不要
+		app, err = firebase.NewApp(ctx, firebaseConfig)
+	} else if cfg.Firebase.PrivateKey != "" {
 		// 本番環境：サービスアカウントキーを使用
 		opt := option.WithCredentialsJSON([]byte(cfg.Firebase.PrivateKey))
 		firebaseConfig := &firebase.Config{
@@ -35,7 +44,7 @@ func NewFirebaseClient(ctx context.Context, cfg *config.Config) (*FirebaseClient
 		}
 		app, err = firebase.NewApp(ctx, firebaseConfig, opt)
 	} else {
-		// 開発環境：デフォルト認証またはEmulator
+		// 開発環境：デフォルト認証
 		firebaseConfig := &firebase.Config{
 			ProjectID: cfg.Firebase.ProjectID,
 		}
@@ -66,7 +75,7 @@ func NewFirebaseClient(ctx context.Context, cfg *config.Config) (*FirebaseClient
 		Firestore:       firestoreClient,
 		Auth:            authClient,
 		SessionRepo:     &SessionRepositoryImpl{firebaseRepo},
-		UserRepo:        &UserRepositoryImpl{firebaseRepo},
+		UserRepo:        NewFirebaseUserRepository(firestoreClient),
 		ParticipantRepo: &ParticipantRepositoryImpl{firebaseRepo},
 		QuestionRepo:    &QuestionRepositoryImpl{firebaseRepo},
 		AnswerRepo:      &AnswerRepositoryImpl{firebaseRepo},
@@ -105,29 +114,6 @@ func (r *SessionRepositoryImpl) List(ctx context.Context, limit int, offset int)
 	return r.ListSessions(ctx, limit, offset)
 }
 
-type UserRepositoryImpl struct {
-	*FirebaseRepository
-}
-
-func (r *UserRepositoryImpl) Create(ctx context.Context, user *domain.User) error {
-	return r.CreateUser(ctx, user)
-}
-
-func (r *UserRepositoryImpl) GetByID(ctx context.Context, id string) (*domain.User, error) {
-	return r.GetUserByID(ctx, id)
-}
-
-func (r *UserRepositoryImpl) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
-	return r.GetUserByEmail(ctx, email)
-}
-
-func (r *UserRepositoryImpl) Update(ctx context.Context, user *domain.User) error {
-	return r.UpdateUser(ctx, user)
-}
-
-func (r *UserRepositoryImpl) Delete(ctx context.Context, id string) error {
-	return r.DeleteUser(ctx, id)
-}
 
 type ParticipantRepositoryImpl struct {
 	*FirebaseRepository

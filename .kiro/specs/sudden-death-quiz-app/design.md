@@ -107,6 +107,99 @@ graph TB
     D --> O
 ```
 
+### ゲームフロー設計
+
+#### 基本的なゲーム進行
+1. **ゲーム作成フェーズ**
+   - 管理者がログインし、管理画面からゲームを作成
+   - システムが初期問題10問をAI APIで生成
+   - ゲームが「参加可能」状態になる
+
+2. **アクセス制御フェーズ**
+   - 参加者がアプリにアクセスするとアクセスコード入力画面を表示
+   - 有効な共通アクセスコード入力でログイン画面に遷移
+   - 無効なコードの場合はエラー表示
+
+3. **ユーザー認証フェーズ**
+   - ログイン画面でユーザー名・パスワードを入力
+   - 管理者が事前登録したユーザー情報と照合
+   - 認証成功で参加可能なゲーム一覧画面に遷移
+
+4. **参加者参加フェーズ**
+   - 参加者がログイン後、参加可能なゲーム一覧を表示
+   - 参加者がゲームを選択して参加
+   - リアルタイムで参加者数が更新される
+
+3. **クイズ進行フェーズ**
+   - 問題を1問ずつ配信（サドンデス形式）
+   - 不正解者は即座に脱落
+   - 10問連続正解者が出現した場合、追加で10問を自動生成
+
+4. **敗者復活戦フェーズ**
+   - 管理者が任意のタイミングで敗者復活戦を開始
+   - 脱落者のみが参加可能（勝者は参加不可）
+   - 復活者は現在進行中のゲームに再参加
+
+5. **ゲーム終了フェーズ**
+   - 最後の1人が残るか全員脱落でゲーム終了
+   - 結果を記録し、統計情報を生成
+
+#### 状態管理設計
+```typescript
+// 認証状態
+interface AuthState {
+  isAccessCodeVerified: boolean;
+  isLoggedIn: boolean;
+  user: User | null;
+  accessCode: string | null;
+}
+
+// ユーザー情報
+interface User {
+  id: string;
+  username: string;
+  displayName: string;
+  createdAt: Date;
+  lastLoginAt: Date;
+}
+
+// ゲーム状態
+interface GameState {
+  id: string;
+  status: 'created' | 'waiting' | 'active' | 'revival' | 'finished';
+  currentQuestionIndex: number;
+  totalQuestions: number;
+  participants: Participant[];
+  eliminatedParticipants: Participant[];
+  winners: Participant[];
+}
+
+// 参加者状態
+interface Participant {
+  id: string;
+  userId: string;
+  displayName: string;
+  status: 'active' | 'eliminated' | 'winner' | 'revived';
+  correctAnswers: number;
+  joinedAt: Date;
+  eliminatedAt?: Date;
+  revivedAt?: Date;
+}
+
+// アクセスコード管理（共通コード）
+interface AccessCodeConfig {
+  commonAccessCode: string;
+  lastUpdated: Date;
+}
+
+// ユーザー管理
+interface UserCredentials {
+  username: string;
+  password: string;
+  displayName: string;
+}
+```
+
 ## コンポーネントと インターフェース
 
 ### フロントエンド（Next.js）
@@ -149,6 +242,117 @@ graph TB
 
 #### 主要コンポーネント設計
 
+**AccessCodeContainer (Container-Presenter パターン)**
+```typescript
+// Container: アクセスコード認証ロジック
+const AccessCodeContainer: React.FC = () => {
+  const { verifyAccessCode, isVerifying, error } = useAccessCode();
+  const [code, setCode] = useState('');
+  
+  const handleSubmit = async (inputCode: string) => {
+    const isValid = await verifyAccessCode(inputCode);
+    if (isValid) {
+      // ログイン画面に遷移
+      router.push('/login');
+    }
+  };
+  
+  return (
+    <AccessCodePresenter 
+      code={code}
+      onCodeChange={setCode}
+      onSubmit={handleSubmit}
+      isVerifying={isVerifying}
+      error={error}
+    />
+  );
+};
+
+// Presenter: UI表示のみ
+const AccessCodePresenter: React.FC<AccessCodePresenterProps> = ({
+  code, onCodeChange, onSubmit, isVerifying, error
+}) => {
+  return (
+    <AccessCodeForm>
+      <Input 
+        value={code} 
+        onChange={onCodeChange}
+        placeholder="アクセスコードを入力"
+        type="password"
+      />
+      <Button 
+        onClick={() => onSubmit(code)}
+        disabled={isVerifying || !code}
+        isLoading={isVerifying}
+      >
+        確認
+      </Button>
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+    </AccessCodeForm>
+  );
+};
+```
+
+**LoginContainer (Container-Presenter パターン)**
+```typescript
+// Container: ユーザーログインロジック
+const LoginContainer: React.FC = () => {
+  const { login, isLoggingIn, error } = useAuth();
+  const [credentials, setCredentials] = useState({
+    username: '',
+    password: ''
+  });
+  
+  const handleSubmit = async (username: string, password: string) => {
+    const success = await login(username, password);
+    if (success) {
+      // ゲーム一覧画面に遷移
+      router.push('/games');
+    }
+  };
+  
+  return (
+    <LoginPresenter 
+      credentials={credentials}
+      onCredentialsChange={setCredentials}
+      onSubmit={handleSubmit}
+      isLoggingIn={isLoggingIn}
+      error={error}
+    />
+  );
+};
+
+// Presenter: UI表示のみ
+const LoginPresenter: React.FC<LoginPresenterProps> = ({
+  credentials, onCredentialsChange, onSubmit, isLoggingIn, error
+}) => {
+  return (
+    <LoginForm>
+      <Input 
+        value={credentials.username} 
+        onChange={(value) => onCredentialsChange({...credentials, username: value})}
+        placeholder="ユーザー名"
+        type="text"
+      />
+      <Input 
+        value={credentials.password} 
+        onChange={(value) => onCredentialsChange({...credentials, password: value})}
+        placeholder="パスワード"
+        type="password"
+      />
+      <Button 
+        onClick={() => onSubmit(credentials.username, credentials.password)}
+        disabled={isLoggingIn || !credentials.username || !credentials.password}
+        isLoading={isLoggingIn}
+      >
+        ログイン
+      </Button>
+      {error && <ErrorMessage>{error}</ErrorMessage>}
+    </LoginForm>
+  );
+};
+```
+
 **QuizContainer (Container-Presenter パターン)**
 ```typescript
 // Container: ビジネスロジック
@@ -182,6 +386,41 @@ const QuizPresenter: React.FC<QuizPresenterProps> = ({
 
 **カスタムHook設計**
 ```typescript
+// useAccessCode.ts - アクセスコード認証管理
+export const useAccessCode = () => {
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const verifyAccessCode = useCallback(async (code: string): Promise<boolean> => {
+    setIsVerifying(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('/api/auth/verify-access-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessCode: code })
+      });
+      
+      if (response.ok) {
+        // アクセスコードをセッションに保存
+        sessionStorage.setItem('accessCode', code);
+        return true;
+      } else {
+        setError('無効なアクセスコードです');
+        return false;
+      }
+    } catch (err) {
+      setError('認証エラーが発生しました');
+      return false;
+    } finally {
+      setIsVerifying(false);
+    }
+  }, []);
+  
+  return { verifyAccessCode, isVerifying, error };
+};
+
 // useQuiz.ts - クイズ状態管理
 export const useQuiz = () => {
   const { socket } = useWebSocket();
@@ -222,28 +461,34 @@ export const useWebSocket = () => {
 │   ├── handler/            # HTTP/WebSocketハンドラー
 │   │   ├── quiz_handler.go
 │   │   ├── admin_handler.go
+│   │   ├── auth_handler.go
 │   │   └── websocket_handler.go
 │   ├── usecase/            # ビジネスロジック
 │   │   ├── quiz_usecase.go
 │   │   ├── user_usecase.go
 │   │   ├── admin_usecase.go
+│   │   ├── auth_usecase.go
 │   │   └── ai_usecase.go
 │   ├── domain/             # ドメインエンティティ
 │   │   ├── quiz.go
 │   │   ├── user.go
 │   │   ├── question.go
-│   │   └── session.go
+│   │   ├── session.go
+│   │   └── access_code.go
 │   ├── repository/         # データアクセス層
 │   │   ├── quiz_repository.go
 │   │   ├── user_repository.go
+│   │   ├── access_code_repository.go
 │   │   └── firebase_repository.go
 │   ├── service/            # 外部サービス連携
 │   │   ├── ai_client.go
 │   │   ├── gemini_client.go
 │   │   ├── openai_client.go
-│   │   └── claude_client.go
+│   │   ├── claude_client.go
+│   │   └── access_code_service.go
 │   ├── middleware/         # ミドルウェア
 │   │   ├── auth.go
+│   │   ├── access_code.go
 │   │   ├── cors.go
 │   │   └── logging.go
 │   └── websocket/          # WebSocket管理
@@ -255,6 +500,8 @@ export const useWebSocket = () => {
 │   │   └── config.go
 │   └── utils/
 │       └── response.go
+├── configs/
+│   └── access_codes.txt    # アクセスコード管理ファイル
 └── tests/
     ├── handler/
     ├── usecase/
@@ -308,6 +555,92 @@ type QuizRepository interface {
     UpdateSession(ctx context.Context, session *Session) error
     SaveAnswer(ctx context.Context, answer *Answer) error
     GetParticipants(ctx context.Context, sessionID string) ([]*User, error)
+}
+
+// アクセスコード管理Repository（共通コード）
+type AccessCodeRepository interface {
+    LoadAccessCode() (string, error)
+    IsValidAccessCode(code string) bool
+    ReloadAccessCode() error
+}
+
+// ユーザー管理Repository
+type UserRepository interface {
+    CreateUser(ctx context.Context, user *User, password string) error
+    GetUserByUsername(ctx context.Context, username string) (*User, error)
+    ValidateUserCredentials(ctx context.Context, username, password string) (*User, error)
+    UpdateUser(ctx context.Context, user *User) error
+    DeleteUser(ctx context.Context, userID string) error
+    BulkCreateUsers(ctx context.Context, users []UserCredentials) error
+}
+
+// テキストファイル実装（共通アクセスコード）
+type FileAccessCodeRepository struct {
+    filePath string
+    code     string
+    lastMod  time.Time
+}
+
+func (r *FileAccessCodeRepository) LoadAccessCode() (string, error) {
+    file, err := os.Open(r.filePath)
+    if err != nil {
+        return "", err
+    }
+    defer file.Close()
+    
+    scanner := bufio.NewScanner(file)
+    if scanner.Scan() {
+        code := strings.TrimSpace(scanner.Text())
+        if code != "" && !strings.HasPrefix(code, "#") {
+            r.code = code
+            return code, nil
+        }
+    }
+    
+    return "", errors.New("valid access code not found")
+}
+
+func (r *FileAccessCodeRepository) IsValidAccessCode(code string) bool {
+    // ファイル更新チェック
+    if r.shouldReload() {
+        r.ReloadAccessCode()
+    }
+    return r.code == code
+}
+
+// Firebase実装（ユーザー管理）
+type FirebaseUserRepository struct {
+    client *firestore.Client
+}
+
+func (r *FirebaseUserRepository) ValidateUserCredentials(ctx context.Context, username, password string) (*User, error) {
+    // ユーザー取得
+    doc, err := r.client.Collection("users").Doc(username).Get(ctx)
+    if err != nil {
+        return nil, err
+    }
+    
+    var userData struct {
+        User
+        PasswordHash string `firestore:"passwordHash"`
+    }
+    
+    if err := doc.DataTo(&userData); err != nil {
+        return nil, err
+    }
+    
+    // パスワード検証
+    if !r.verifyPassword(password, userData.PasswordHash) {
+        return nil, errors.New("invalid credentials")
+    }
+    
+    return &userData.User, nil
+}
+
+func (r *FirebaseUserRepository) verifyPassword(password, hash string) bool {
+    // bcryptを使用したパスワード検証
+    err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+    return err == nil
 }
 
 // Firebase実装
@@ -364,6 +697,121 @@ func (h *Hub) Run() {
             }
         }
     }
+}
+
+// 認証ハンドラー設計
+type AuthHandler struct {
+    authUseCase AuthUseCase
+}
+
+func (h *AuthHandler) VerifyAccessCode(c *gin.Context) {
+    var req struct {
+        AccessCode string `json:"accessCode" binding:"required"`
+    }
+    
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(400, gin.H{"error": "Invalid request"})
+        return
+    }
+    
+    isValid, err := h.authUseCase.VerifyAccessCode(c.Request.Context(), req.AccessCode)
+    if err != nil {
+        c.JSON(500, gin.H{"error": "Internal server error"})
+        return
+    }
+    
+    if !isValid {
+        c.JSON(401, gin.H{"error": "Invalid access code"})
+        return
+    }
+    
+    // セッションにアクセスコードを保存
+    session := sessions.Default(c)
+    session.Set("access_code_verified", true)
+    session.Set("access_code", req.AccessCode)
+    session.Save()
+    
+    c.JSON(200, gin.H{"message": "Access code verified"})
+}
+
+func (h *AuthHandler) Login(c *gin.Context) {
+    var req struct {
+        Username   string `json:"username" binding:"required"`
+        Password   string `json:"password" binding:"required"`
+        AccessCode string `json:"accessCode" binding:"required"`
+    }
+    
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(400, gin.H{"error": "Invalid request"})
+        return
+    }
+    
+    // アクセスコード再確認
+    isValid, err := h.authUseCase.VerifyAccessCode(c.Request.Context(), req.AccessCode)
+    if err != nil || !isValid {
+        c.JSON(401, gin.H{"error": "Invalid access code"})
+        return
+    }
+    
+    // ユーザー認証
+    user, err := h.authUseCase.AuthenticateUser(c.Request.Context(), req.Username, req.Password)
+    if err != nil {
+        c.JSON(401, gin.H{"error": "Invalid username or password"})
+        return
+    }
+    
+    // JWTトークン生成
+    token, err := h.authUseCase.GenerateToken(user)
+    if err != nil {
+        c.JSON(500, gin.H{"error": "Failed to generate token"})
+        return
+    }
+    
+    c.JSON(200, gin.H{
+        "user":  user,
+        "token": token,
+    })
+}
+
+// 管理者用ユーザー管理API
+func (h *AuthHandler) CreateUser(c *gin.Context) {
+    var req struct {
+        Username    string `json:"username" binding:"required"`
+        Password    string `json:"password" binding:"required"`
+        DisplayName string `json:"displayName" binding:"required"`
+    }
+    
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(400, gin.H{"error": "Invalid request"})
+        return
+    }
+    
+    user, err := h.authUseCase.CreateUser(c.Request.Context(), req.Username, req.Password, req.DisplayName)
+    if err != nil {
+        c.JSON(500, gin.H{"error": "Failed to create user"})
+        return
+    }
+    
+    c.JSON(201, user)
+}
+
+func (h *AuthHandler) BulkCreateUsers(c *gin.Context) {
+    var req struct {
+        Users []UserCredentials `json:"users" binding:"required"`
+    }
+    
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(400, gin.H{"error": "Invalid request"})
+        return
+    }
+    
+    err := h.authUseCase.BulkCreateUsers(c.Request.Context(), req.Users)
+    if err != nil {
+        c.JSON(500, gin.H{"error": "Failed to create users"})
+        return
+    }
+    
+    c.JSON(200, gin.H{"message": "Users created successfully"})
 }
 ```
 

@@ -15,11 +15,8 @@ func CORS(cfg *config.Config) gin.HandlerFunc {
 		AllowCredentials: true,
 	}
 
-	if cfg.Server.Environment == "development" {
-		config.AllowAllOrigins = true
-	} else {
-		config.AllowOrigins = cfg.Server.AllowedOrigins
-	}
+	// 開発環境では明示的にlocalhostのみ許可
+	config.AllowOrigins = []string{"http://localhost:3000"}
 
 	return cors.New(config)
 }

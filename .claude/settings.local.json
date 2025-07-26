@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(go mod init:*)",
+      "Bash(touch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(docker compose:*)",
+      "Bash(go mod:*)",
+      "Bash(node:*)",
+      "Bash(npm:*)",
+      "Bash(docker-compose:*)",
+      "Bash(docker:*)",
+      "Bash(go test:*)",
+      "Bash(git checkout:*)",
+      "Bash(rm:*)",
+      "Bash(curl:*)",
+      "Bash(npx jest:*)",
+      "Bash(npx tsc:*)",
+      "Bash(go build:*)",
+      "Bash(true)"
+    ],
+    "deny": []
+  }
+}

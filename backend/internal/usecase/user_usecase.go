@@ -30,7 +30,7 @@ func (u *userUseCase) CreateUser(ctx context.Context, displayName, email string,
 		}
 	}
 
-	user := domain.NewUser(displayName, email, isAnonymous)
+	user := domain.NewUserWithEmail(displayName, email, isAnonymous)
 	
 	if err := u.userRepo.Create(ctx, user); err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)

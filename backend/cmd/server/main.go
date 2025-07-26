@@ -17,6 +17,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 )
 
@@ -47,6 +49,17 @@ func main() {
 
 	router := gin.New()
 
+	// セッション設定
+	store := cookie.NewStore([]byte("quiz-app-secret-key"))
+	store.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7, // 7日間
+		HttpOnly: true,
+		Secure:   cfg.Server.Environment == "production",
+		SameSite: http.SameSiteLaxMode,
+	})
+	router.Use(sessions.Sessions("quiz-session", store))
+
 	// ミドルウェア設定
 	router.Use(middleware.Logger())
 	router.Use(middleware.Recovery())
@@ -55,6 +68,12 @@ func main() {
 
 	// 認証ミドルウェア
 	authMiddleware := middleware.NewAuthMiddleware(firebaseClient.Auth)
+	
+	// アクセスコード認証の初期化
+	accessCodeRepo := repository.NewFileAccessCodeRepository("/app/configs/access_codes.txt")
+	authUseCase := usecase.NewAuthUseCase(accessCodeRepo, firebaseClient.UserRepo)
+	authHandler := handler.NewAuthHandler(authUseCase)
+	accessCodeMiddleware := middleware.NewAccessCodeMiddleware(authUseCase)
 
 	// ヘルスチェック
 	router.GET("/health", func(c *gin.Context) {
@@ -135,21 +154,29 @@ func main() {
 	// API ルート
 	v1 := router.Group("/api/v1")
 	{
+		// アクセスコード認証エンドポイント
+		auth := v1.Group("/auth")
+		{
+			auth.POST("/verify-access-code", authHandler.VerifyAccessCode)
+			auth.POST("/login", authHandler.Login)
+			auth.GET("/me", accessCodeMiddleware.RequireUserAuth(), authHandler.GetMe)
+		}
+		
 		// 認証不要のエンドポイント
 		v1.GET("/sessions/:id/info", sessionHandler.GetSessionInfo)
 		v1.GET("/sessions/:id/status", sessionHandler.GetSessionStatus)
 
-		// 認証必要のエンドポイント
-		auth := v1.Group("")
-		auth.Use(authMiddleware.RequireAuth())
+		// 認証必要のエンドポイント（Firebase認証）
+		authRequired := v1.Group("")
+		authRequired.Use(authMiddleware.RequireAuth())
 		{
 			// セッション関連
-			auth.POST("/sessions/:id/join", sessionHandler.JoinSession)
-			auth.GET("/sessions/:id/participants", sessionHandler.GetParticipants)
+			authRequired.POST("/sessions/:id/join", sessionHandler.JoinSession)
+			authRequired.GET("/sessions/:id/participants", sessionHandler.GetParticipants)
 
 			// クイズ関連
-			auth.GET("/sessions/:id/current-question", quizHandler.GetCurrentQuestion)
-			auth.POST("/sessions/:id/answers", quizHandler.SubmitAnswer)
+			authRequired.GET("/sessions/:id/current-question", quizHandler.GetCurrentQuestion)
+			authRequired.POST("/sessions/:id/answers", quizHandler.SubmitAnswer)
 		}
 
 		// 管理者専用のエンドポイント

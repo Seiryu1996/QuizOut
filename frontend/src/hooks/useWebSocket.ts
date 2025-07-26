@@ -231,9 +231,9 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
     sendMessage('join_session', { sessionId });
   }, [sendMessage]);
 
-  // 自動接続
+  // 自動接続（開発環境では一時的に無効化）
   useEffect(() => {
-    if (autoConnect && authToken) {
+    if (autoConnect && authToken && process.env.NODE_ENV !== 'development') {
       connect();
     }
 

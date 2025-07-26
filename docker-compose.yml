@@ -14,13 +14,19 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-development}
     ports:
       - "8080:8080"
     environment:
       - PORT=8080
-      - FIREBASE_PROJECT_ID=quiz-app-dev
-      - FIRESTORE_EMULATOR_HOST=firestore-emulator:8081
-      - FIREBASE_AUTH_EMULATOR_HOST=firestore-emulator:9099
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-quiz-app-dev}
+      - FIRESTORE_EMULATOR_HOST=${FIRESTORE_EMULATOR_HOST:-firestore-emulator:8081}
+      - FIREBASE_AUTH_EMULATOR_HOST=${FIREBASE_AUTH_EMULATOR_HOST:-firestore-emulator:9099}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY:-}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL:-}
+      - FIREBASE_DATABASE_URL=${FIREBASE_DATABASE_URL:-}
+      - FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - CLAUDE_API_KEY=${CLAUDE_API_KEY:-}
@@ -36,13 +42,17 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
-      - NEXT_PUBLIC_WS_URL=ws://localhost:8080
-      - NEXT_PUBLIC_FIREBASE_PROJECT_ID=quiz-app-dev
+      - NODE_ENV=${NODE_ENV:-development}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+      - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-ws://localhost:8080/ws}
+      - NEXT_PUBLIC_FIREBASE_PROJECT_ID=${NEXT_PUBLIC_FIREBASE_PROJECT_ID:-quiz-app-dev}
+      - NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY:-}
+      - NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:-}
+      - NEXT_PUBLIC_FIREBASE_DATABASE_URL=${NEXT_PUBLIC_FIREBASE_DATABASE_URL:-}
+      - NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:-}
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
       - backend
-
+    command: sh -c "npm run dev"
