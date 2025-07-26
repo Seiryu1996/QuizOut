@@ -121,8 +121,9 @@ graph TB
    - 無効なコードの場合はエラー表示
 
 3. **ユーザー認証フェーズ**
-   - ログイン画面でユーザー名・パスワードを入力
-   - 管理者が事前登録したユーザー情報と照合
+   - アクセスコード認証後、ログイン画面でユーザー名・パスワードを入力
+   - 事前登録されたユーザー情報（admin/admin123, manager/manager123等）と照合
+   - セッションベース認証でユーザー状態を管理
    - 認証成功で参加可能なゲーム一覧画面に遷移
 
 4. **参加者参加フェーズ**
@@ -154,14 +155,28 @@ interface AuthState {
   accessCode: string | null;
 }
 
-// ユーザー情報
+// ユーザー情報（実装版）
 interface User {
   id: string;
   username: string;
   displayName: string;
+  email?: string;
   createdAt: Date;
-  lastLoginAt: Date;
+  updatedAt: Date;
 }
+
+// 管理者権限情報
+interface UserRole {
+  admin: 'admin';
+  manager: 'manager'; 
+  user: 'user';
+}
+
+// 管理者ユーザー名マッピング
+const AdminUsernames = {
+  'admin': 'admin',
+  'manager': 'manager'
+};
 
 // ゲーム状態
 interface GameState {
@@ -186,18 +201,28 @@ interface Participant {
   revivedAt?: Date;
 }
 
-// アクセスコード管理（共通コード）
+// アクセスコード管理（複数コード対応）
 interface AccessCodeConfig {
-  commonAccessCode: string;
+  filePath: string;
+  validCodes: string[];  // 複数のアクセスコードをサポート
   lastUpdated: Date;
 }
 
-// ユーザー管理
+// ユーザー管理（実装版）
 interface UserCredentials {
   username: string;
   password: string;
   displayName: string;
 }
+
+// 初期ユーザーデータ（シード用）
+const InitialUsers = [
+  { username: 'admin', password: 'admin123', displayName: 'システム管理者' },
+  { username: 'manager', password: 'manager123', displayName: 'イベント管理者' },
+  { username: 'user1', password: 'user123', displayName: '参加者1' },
+  { username: 'testuser', password: 'password123', displayName: 'テストユーザー' },
+  // 追加ユーザー...
+];
 ```
 
 ## コンポーネントと インターフェース
@@ -557,11 +582,12 @@ type QuizRepository interface {
     GetParticipants(ctx context.Context, sessionID string) ([]*User, error)
 }
 
-// アクセスコード管理Repository（共通コード）
+// アクセスコード管理Repository（複数コード対応）
 type AccessCodeRepository interface {
-    LoadAccessCode() (string, error)
+    LoadAccessCodes() ([]string, error)
     IsValidAccessCode(code string) bool
-    ReloadAccessCode() error
+    GetValidAccessCodes() []string
+    ReloadAccessCodes() error
 }
 
 // ユーザー管理Repository
@@ -574,38 +600,53 @@ type UserRepository interface {
     BulkCreateUsers(ctx context.Context, users []UserCredentials) error
 }
 
-// テキストファイル実装（共通アクセスコード）
+// テキストファイル実装（複数アクセスコード対応）
 type FileAccessCodeRepository struct {
     filePath string
-    code     string
+    codes    []string
     lastMod  time.Time
 }
 
-func (r *FileAccessCodeRepository) LoadAccessCode() (string, error) {
+func (r *FileAccessCodeRepository) LoadAccessCodes() ([]string, error) {
     file, err := os.Open(r.filePath)
     if err != nil {
-        return "", err
+        return nil, err
     }
     defer file.Close()
     
+    var codes []string
     scanner := bufio.NewScanner(file)
-    if scanner.Scan() {
-        code := strings.TrimSpace(scanner.Text())
-        if code != "" && !strings.HasPrefix(code, "#") {
-            r.code = code
-            return code, nil
+    for scanner.Scan() {
+        line := strings.TrimSpace(scanner.Text())
+        if line != "" && !strings.HasPrefix(line, "#") {
+            codes = append(codes, line)
         }
     }
     
-    return "", errors.New("valid access code not found")
+    if len(codes) == 0 {
+        return nil, errors.New("no valid access codes found")
+    }
+    
+    r.codes = codes
+    return codes, nil
 }
 
 func (r *FileAccessCodeRepository) IsValidAccessCode(code string) bool {
     // ファイル更新チェック
     if r.shouldReload() {
-        r.ReloadAccessCode()
+        r.ReloadAccessCodes()
     }
-    return r.code == code
+    
+    for _, validCode := range r.codes {
+        if validCode == code {
+            return true
+        }
+    }
+    return false
+}
+
+func (r *FileAccessCodeRepository) GetValidAccessCodes() []string {
+    return r.codes
 }
 
 // Firebase実装（ユーザー管理）
@@ -735,45 +776,44 @@ func (h *AuthHandler) VerifyAccessCode(c *gin.Context) {
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
+    // セッションからアクセスコード認証済みかチェック
+    session := sessions.Default(c)
+    accessCodeVerified := session.Get("access_code_verified")
+    if accessCodeVerified != true {
+        c.JSON(401, gin.H{"error": "アクセスコード認証が必要です"})
+        return
+    }
+
     var req struct {
-        Username   string `json:"username" binding:"required"`
-        Password   string `json:"password" binding:"required"`
-        AccessCode string `json:"accessCode" binding:"required"`
+        Username string `json:"username" binding:"required"`
+        Password string `json:"password" binding:"required"`
     }
     
     if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(400, gin.H{"error": "Invalid request"})
-        return
-    }
-    
-    // アクセスコード再確認
-    isValid, err := h.authUseCase.VerifyAccessCode(c.Request.Context(), req.AccessCode)
-    if err != nil || !isValid {
-        c.JSON(401, gin.H{"error": "Invalid access code"})
+        c.JSON(400, gin.H{"error": "Invalid request format"})
         return
     }
     
     // ユーザー認証
     user, err := h.authUseCase.AuthenticateUser(c.Request.Context(), req.Username, req.Password)
     if err != nil {
-        c.JSON(401, gin.H{"error": "Invalid username or password"})
+        c.JSON(401, gin.H{"error": "無効なユーザー名またはパスワードです"})
         return
     }
     
-    // JWTトークン生成
-    token, err := h.authUseCase.GenerateToken(user)
-    if err != nil {
-        c.JSON(500, gin.H{"error": "Failed to generate token"})
-        return
-    }
+    // セッションにユーザー情報を保存
+    session.Set("user_id", user.ID)
+    session.Set("username", user.Username)
+    session.Set("display_name", user.DisplayName)
+    session.Save()
     
     c.JSON(200, gin.H{
-        "user":  user,
-        "token": token,
+        "user":    user,
+        "message": "ログインが成功しました",
     })
 }
 
-// 管理者用ユーザー管理API
+// 管理者用ユーザー管理API（管理者権限チェック付き）
 func (h *AuthHandler) CreateUser(c *gin.Context) {
     var req struct {
         Username    string `json:"username" binding:"required"`
@@ -782,17 +822,57 @@ func (h *AuthHandler) CreateUser(c *gin.Context) {
     }
     
     if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(400, gin.H{"error": "Invalid request"})
+        c.JSON(400, gin.H{"error": "Invalid request format"})
         return
     }
     
     user, err := h.authUseCase.CreateUser(c.Request.Context(), req.Username, req.Password, req.DisplayName)
     if err != nil {
-        c.JSON(500, gin.H{"error": "Failed to create user"})
+        if strings.Contains(err.Error(), "already exists") {
+            c.JSON(409, gin.H{"error": "ユーザー名が既に存在します"})
+        } else {
+            c.JSON(500, gin.H{"error": "ユーザー作成に失敗しました"})
+        }
         return
     }
     
-    c.JSON(201, user)
+    c.JSON(201, gin.H{
+        "user":    user,
+        "message": "ユーザーが作成されました",
+    })
+}
+
+func (h *AuthHandler) GetUsers(c *gin.Context) {
+    users, err := h.authUseCase.GetAllUsers(c.Request.Context())
+    if err != nil {
+        c.JSON(500, gin.H{"error": "ユーザー一覧の取得に失敗しました"})
+        return
+    }
+
+    c.JSON(200, gin.H{
+        "users": users,
+        "count": len(users),
+    })
+}
+
+func (h *AuthHandler) DeleteUser(c *gin.Context) {
+    userID := c.Param("id")
+    if userID == "" {
+        c.JSON(400, gin.H{"error": "ユーザーIDが必要です"})
+        return
+    }
+
+    err := h.authUseCase.DeleteUser(c.Request.Context(), userID)
+    if err != nil {
+        if strings.Contains(err.Error(), "not found") {
+            c.JSON(404, gin.H{"error": "ユーザーが見つかりません"})
+        } else {
+            c.JSON(500, gin.H{"error": "ユーザーの削除に失敗しました"})
+        }
+        return
+    }
+
+    c.JSON(200, gin.H{"message": "ユーザーが削除されました"})
 }
 
 func (h *AuthHandler) BulkCreateUsers(c *gin.Context) {
@@ -801,17 +881,20 @@ func (h *AuthHandler) BulkCreateUsers(c *gin.Context) {
     }
     
     if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(400, gin.H{"error": "Invalid request"})
+        c.JSON(400, gin.H{"error": "Invalid request format"})
         return
     }
     
     err := h.authUseCase.BulkCreateUsers(c.Request.Context(), req.Users)
     if err != nil {
-        c.JSON(500, gin.H{"error": "Failed to create users"})
+        c.JSON(500, gin.H{"error": "一括ユーザー作成に失敗しました"})
         return
     }
     
-    c.JSON(200, gin.H{"message": "Users created successfully"})
+    c.JSON(201, gin.H{
+        "message": fmt.Sprintf("%d人のユーザーが作成されました", len(req.Users)),
+        "count":   len(req.Users),
+    })
 }
 ```
 
