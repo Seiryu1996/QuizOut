@@ -23,6 +23,7 @@ type UserRepository interface {
 	Update(ctx context.Context, user *domain.User) error
 	Delete(ctx context.Context, id string) error
 	BulkCreateUsers(ctx context.Context, users []UserCredentials) error
+	GetAll(ctx context.Context) ([]*domain.User, error)
 }
 
 type UserCredentials struct {

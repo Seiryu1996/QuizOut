@@ -8,26 +8,30 @@ export default function HomePage() {
   const router = useRouter();
 
   useEffect(() => {
-    // アクセスコードが設定されているかチェック
-    const accessCode = authService.getAccessCodeFromStorage();
-    
-    if (!accessCode) {
-      // アクセスコードがない場合はアクセスコード入力ページにリダイレクト
-      router.push('/access-code');
-    } else {
-      // アクセスコードがある場合はユーザー認証状態を確認
-      checkUserAuth();
-    }
+    checkUserAuth();
   }, [router]);
 
   const checkUserAuth = async () => {
     try {
-      // ユーザー情報を取得してログイン状態を確認
-      await authService.getMe();
-      // ログイン済みの場合はクイズ選択画面を表示
-      router.push('/quiz-selection');
+      // アクセスコードをチェック
+      const accessCode = authService.getAccessCodeFromStorage();
+      
+      if (!accessCode) {
+        // アクセスコードがない場合はアクセスコード入力ページにリダイレクト
+        router.push('/access-code');
+        return;
+      }
+
+      // 認証状態をチェック
+      if (authService.isAuthenticated()) {
+        // ログイン済みの場合はクイズ選択画面を表示
+        router.push('/quiz-selection');
+      } else {
+        // ログインしていない場合はログインページにリダイレクト
+        router.push('/login');
+      }
     } catch (error) {
-      // ログインしていない場合はログインページにリダイレクト
+      // エラーの場合はログインページにリダイレクト
       router.push('/login');
     }
   };

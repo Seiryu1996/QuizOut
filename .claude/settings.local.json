@@ -20,7 +20,9 @@
       "Bash(npx jest:*)",
       "Bash(npx tsc:*)",
       "Bash(go build:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(ls:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }
