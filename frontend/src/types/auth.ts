@@ -11,12 +11,11 @@ export interface AccessCodeState {
 // ユーザー情報
 export interface User {
   id: string;
+  username: string;
   displayName: string;
   email?: string;
-  isAnonymous: boolean;
-  accessCode: string;
   createdAt: string;
-  lastLoginAt: string;
+  updatedAt: string;
 }
 
 // アクセスコード検証リクエスト
@@ -32,8 +31,8 @@ export interface VerifyAccessCodeResponse {
 
 // ログインリクエスト
 export interface LoginRequest {
-  name: string;
-  accessCode: string;
+  username: string;
+  password: string;
 }
 
 // ログインレスポンス

@@ -11,7 +11,8 @@ interface LoginFormProps {
 }
 
 export const LoginForm: React.FC<LoginFormProps> = ({ accessCode, onSuccess }) => {
-  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [currentAccessCode, setCurrentAccessCode] = useState(accessCode || '');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,8 +35,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ accessCode, onSuccess }) =
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
-    if (!name.trim()) {
-      setError('名前を入力してください');
+    if (!username.trim()) {
+      setError('ユーザー名を入力してください');
+      return;
+    }
+
+    if (!password.trim()) {
+      setError('パスワードを入力してください');
       return;
     }
 
@@ -48,7 +54,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ accessCode, onSuccess }) =
     setError(null);
 
     try {
-      const response = await authService.login(name.trim(), currentAccessCode);
+      const response = await authService.login(username.trim(), password.trim());
       
       if (onSuccess) {
         onSuccess(response.user);
@@ -68,8 +74,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({ accessCode, onSuccess }) =
     }
   };
 
-  const handleNameChange = (value: string) => {
-    setName(value);
+  const handleUsernameChange = (value: string) => {
+    setUsername(value);
+    if (error) {
+      setError(null);
+    }
+  };
+
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
     if (error) {
       setError(null);
     }
@@ -88,7 +101,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ accessCode, onSuccess }) =
               QuizOut
             </h1>
             <p className="text-gray-600">
-              ユーザー名を入力してください
+              ユーザー名とパスワードを入力してください
             </p>
             {currentAccessCode && (
               <div className="mt-3 inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800">
@@ -102,15 +115,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({ accessCode, onSuccess }) =
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="userName" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
                 ユーザー名
               </label>
               <input
-                id="userName"
+                id="username"
                 type="text"
-                value={name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="あなたの名前を入力"
+                value={username}
+                onChange={(e) => handleUsernameChange(e.target.value)}
+                placeholder="ユーザー名を入力"
                 className={
                   `w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
                     error 
@@ -120,8 +133,31 @@ export const LoginForm: React.FC<LoginFormProps> = ({ accessCode, onSuccess }) =
                 }
                 disabled={isLoading}
                 maxLength={50}
-                autoComplete="name"
+                autoComplete="username"
                 autoFocus
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                パスワード
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => handlePasswordChange(e.target.value)}
+                placeholder="パスワードを入力"
+                className={
+                  `w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                    error 
+                      ? 'border-red-300 bg-red-50' 
+                      : 'border-gray-300 bg-white'
+                  }`
+                }
+                disabled={isLoading}
+                maxLength={100}
+                autoComplete="current-password"
               />
               {error && (
                 <p className="mt-2 text-sm text-red-600 flex items-center">
@@ -144,10 +180,10 @@ export const LoginForm: React.FC<LoginFormProps> = ({ accessCode, onSuccess }) =
               </button>
               <button
                 type="submit"
-                disabled={!name.trim() || isLoading}
+                disabled={!username.trim() || !password.trim() || isLoading}
                 className={
                   `flex-1 flex justify-center items-center py-3 px-4 border border-transparent rounded-lg text-white font-medium transition-all duration-200 ${
-                    !name.trim() || isLoading
+                    !username.trim() || !password.trim() || isLoading
                       ? 'bg-gray-400 cursor-not-allowed'
                       : 'bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 transform hover:scale-105'
                   }`

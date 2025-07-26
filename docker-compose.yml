@@ -10,6 +10,23 @@ services:
     working_dir: /home/node
     command: firebase emulators:start --only firestore,auth,ui --project quiz-app-dev
 
+  db-seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-development}
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-quiz-app-dev}
+      - FIRESTORE_EMULATOR_HOST=${FIRESTORE_EMULATOR_HOST:-firestore-emulator:8081}
+      - FIREBASE_AUTH_EMULATOR_HOST=${FIREBASE_AUTH_EMULATOR_HOST:-firestore-emulator:9099}
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - firestore-emulator
+    command: sh -c "sleep 10 && go run ./cmd/seed/main.go"
+    restart: "no"
+
   backend:
     build:
       context: ./backend
@@ -34,6 +51,7 @@ services:
       - ./backend:/app
     depends_on:
       - firestore-emulator
+      - db-seed
 
   frontend:
     build:

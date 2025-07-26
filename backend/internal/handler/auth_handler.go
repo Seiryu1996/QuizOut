@@ -218,6 +218,51 @@ func (h *AuthHandler) BulkCreateUsers(c *gin.Context) {
 	})
 }
 
+// GetUsers 管理者用ユーザー一覧取得
+func (h *AuthHandler) GetUsers(c *gin.Context) {
+	users, err := h.authUseCase.GetAllUsers(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "ユーザー一覧の取得に失敗しました",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"users": users,
+		"count": len(users),
+	})
+}
+
+// DeleteUser 管理者用ユーザー削除
+func (h *AuthHandler) DeleteUser(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "ユーザーIDが必要です",
+		})
+		return
+	}
+
+	err := h.authUseCase.DeleteUser(c.Request.Context(), userID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "ユーザーが見つかりません",
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "ユーザーの削除に失敗しました",
+			})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "ユーザーが削除されました",
+	})
+}
+
 // logLoginAttempt ログイン試行のログ記録
 func (h *AuthHandler) logLoginAttempt(c *gin.Context, accessCode string, success bool) {
 	userAgent := c.GetHeader("User-Agent")

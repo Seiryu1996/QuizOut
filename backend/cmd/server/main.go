@@ -161,6 +161,18 @@ func main() {
 			auth.POST("/login", authHandler.Login)
 			auth.GET("/me", accessCodeMiddleware.RequireUserAuth(), authHandler.GetMe)
 		}
+
+		// 管理者専用エンドポイント（新しい認証システム）
+		adminAuth := v1.Group("/admin")
+		adminAuth.Use(accessCodeMiddleware.RequireUserAuth())
+		adminAuth.Use(middleware.AdminMiddleware(firebaseClient.UserRepo))
+		{
+			// ユーザー管理
+			adminAuth.GET("/users", authHandler.GetUsers)
+			adminAuth.POST("/users", authHandler.CreateUser)
+			adminAuth.DELETE("/users/:id", authHandler.DeleteUser)
+			adminAuth.POST("/users/bulk", authHandler.BulkCreateUsers)
+		}
 		
 		// 認証不要のエンドポイント
 		v1.GET("/sessions/:id/info", sessionHandler.GetSessionInfo)

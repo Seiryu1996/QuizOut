@@ -8,9 +8,10 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig
-	Firebase FirebaseConfig
-	AI       AIConfig
+	Server     ServerConfig
+	Firebase   FirebaseConfig
+	AI         AIConfig
+	AccessCode AccessCodeConfig
 }
 
 type ServerConfig struct {
@@ -35,6 +36,10 @@ type AIConfig struct {
 	GeminiAPIKey string
 	OpenAIAPIKey string
 	ClaudeAPIKey string
+}
+
+type AccessCodeConfig struct {
+	FilePath string
 }
 
 func Load() (*Config, error) {
@@ -63,6 +68,9 @@ func Load() (*Config, error) {
 			GeminiAPIKey: getEnv("GEMINI_API_KEY", ""),
 			OpenAIAPIKey: getEnv("OPENAI_API_KEY", ""),
 			ClaudeAPIKey: getEnv("CLAUDE_API_KEY", ""),
+		},
+		AccessCode: AccessCodeConfig{
+			FilePath: getEnv("ACCESS_CODE_FILE_PATH", "/app/configs/access_codes.txt"),
 		},
 	}
 

@@ -36,13 +36,13 @@ class AuthService {
   }
 
   // ユーザーログイン（アクセスコード検証後）
-  async login(name: string, accessCode: string): Promise<LoginResponse> {
+  async login(username: string, password: string): Promise<LoginResponse> {
     const response = await fetch(`${this.baseURL}/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ name, accessCode } as LoginRequest),
+      body: JSON.stringify({ username, password } as LoginRequest),
       credentials: 'include',
     });
 

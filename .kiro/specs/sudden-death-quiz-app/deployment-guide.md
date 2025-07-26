@@ -91,7 +91,7 @@ gcloud init
 # Node.js (v18以上)
 # https://nodejs.org/
 
-# Go (v1.21以上)
+# Go (v1.23以上)
 # https://golang.org/dl/
 ```
 
@@ -197,7 +197,7 @@ NEXT_PUBLIC_FIREBASE_APP_ID=1:123456789:web:abcdef
 
 ```dockerfile
 # backend/Dockerfile
-FROM golang:1.21-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
 COPY go.mod go.sum ./
@@ -326,7 +326,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.21
+          go-version: 1.23
       
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -428,7 +428,7 @@ jobs:
 # cloudbuild.yaml
 steps:
   # Backend Tests
-  - name: 'golang:1.21'
+  - name: 'golang:1.23'
     dir: 'backend'
     entrypoint: 'go'
     args: ['test', '-v', './...']
