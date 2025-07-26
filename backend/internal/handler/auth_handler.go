@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 
@@ -101,20 +103,40 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	var req LoginRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	// 生のJSONボディを直接読み取り
+	body, err := c.GetRawData()
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request format",
-			"details": err.Error(),
+			"error": "Failed to read request body",
+		})
+		return
+	}
+
+	// json.Unmarshalを使用してパース
+	var requestData map[string]interface{}
+	if err := json.Unmarshal(body, &requestData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid JSON format",
+		})
+		return
+	}
+
+	// 手動でフィールドを抽出・検証
+	username, usernameExists := requestData["username"].(string)
+	password, passwordExists := requestData["password"].(string)
+
+	if !usernameExists || !passwordExists || username == "" || password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "username and password are required",
 		})
 		return
 	}
 
 	// ユーザー認証
-	user, err := h.authUseCase.AuthenticateUser(c.Request.Context(), req.Username, req.Password)
+	user, err := h.authUseCase.AuthenticateUser(c.Request.Context(), username, password)
 	if err != nil {
 		// ログイン試行のログ記録
-		h.logLoginAttempt(c, req.Username, false)
+		h.logLoginAttempt(c, username, false)
 		
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": "無効なユーザー名またはパスワードです",
@@ -123,7 +145,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	// 成功ログ
-	h.logLoginAttempt(c, req.Username, true)
+	h.logLoginAttempt(c, username, true)
 
 	// セッションにユーザー情報を保存
 	session.Set("user_id", user.ID)
@@ -139,14 +161,40 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 // GetMe 現在のユーザー情報を取得
 func (h *AuthHandler) GetMe(c *gin.Context) {
-	// ミドルウェアで設定されたユーザー情報を取得
-	user, exists := c.Get("user")
-	if !exists {
+	log.Printf("=== GetMe function called ===")
+	// セッションから直接ユーザー情報を取得
+	session := sessions.Default(c)
+	userIDInterface := session.Get("user_id")
+	log.Printf("GetMe: Session user_id = %v", userIDInterface)
+	
+	if userIDInterface == nil {
+		log.Printf("GetMe: No user_id in session")
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"error": "User not authenticated",
 		})
 		return
 	}
+
+	userID, ok := userIDInterface.(string)
+	if !ok {
+		log.Printf("GetMe: Invalid user_id type: %T", userIDInterface)
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Invalid session",
+		})
+		return
+	}
+
+	// ユーザー情報を取得
+	user, err := h.authUseCase.GetUserByID(c.Request.Context(), userID)
+	if err != nil {
+		log.Printf("GetMe: User not found: %s, error: %v", userID, err)
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "User not found",
+		})
+		return
+	}
+
+	log.Printf("GetMe: User found: %s (%s)", user.Username, user.ID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"user": user,

@@ -18,6 +18,9 @@ type AuthUseCase interface {
 	AuthenticateUser(ctx context.Context, username, password string) (*domain.User, error)
 	CreateUser(ctx context.Context, username, password, displayName string) (*domain.User, error)
 	BulkCreateUsers(ctx context.Context, users []repository.UserCredentials) error
+	GetAllUsers(ctx context.Context) ([]*domain.User, error)
+	GetUserByID(ctx context.Context, userID string) (*domain.User, error)
+	DeleteUser(ctx context.Context, userID string) error
 	LogLoginAttempt(ctx context.Context, identifier string, success bool, userAgent, ipAddress string) error
 	GetValidAccessCodes(ctx context.Context) ([]string, error)
 }
@@ -163,6 +166,34 @@ func (u *authUseCase) LogLoginAttempt(ctx context.Context, accessCode string, su
 	// TODO: ログエントリをデータベースに保存する実装を追加
 
 	return nil
+}
+
+// GetAllUsers 全ユーザーの取得（管理者用）
+func (u *authUseCase) GetAllUsers(ctx context.Context) ([]*domain.User, error) {
+	return u.userRepo.GetAll(ctx)
+}
+
+// GetUserByID IDでユーザーを取得
+func (u *authUseCase) GetUserByID(ctx context.Context, userID string) (*domain.User, error) {
+	return u.userRepo.GetByID(ctx, userID)
+}
+
+// DeleteUser ユーザー削除（管理者用）
+func (u *authUseCase) DeleteUser(ctx context.Context, userID string) error {
+	if userID == "" {
+		return errors.New("user ID cannot be empty")
+	}
+
+	// ユーザーが存在するかチェック
+	user, err := u.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		return errors.New("user not found")
+	}
+	if user == nil {
+		return errors.New("user not found")
+	}
+
+	return u.userRepo.Delete(ctx, userID)
 }
 
 // GetValidAccessCodes 有効なアクセスコード一覧を取得（管理者用）

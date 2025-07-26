@@ -123,7 +123,11 @@ graph TB
 3. **ユーザー認証フェーズ**
    - アクセスコード認証後、ログイン画面でユーザー名・パスワードを入力
    - 事前登録されたユーザー情報（admin/admin123, manager/manager123等）と照合
-   - セッションベース認証でユーザー状態を管理
+   - **ハイブリッド認証システム**:
+     - バックエンド: セッションベース認証でサーバーサイド状態管理
+     - フロントエンド: sessionStorageでクライアントサイド状態管理
+     - GetMeエンドポイント問題の回避策として、ログイン成功時にユーザー情報をローカル保存
+   - 認証成功時にユーザー情報をsessionStorage保存し、認証状態を維持
    - 認証成功で参加可能なゲーム一覧画面に遷移
 
 4. **参加者参加フェーズ**
@@ -147,12 +151,12 @@ graph TB
 
 #### 状態管理設計
 ```typescript
-// 認証状態
+// 認証状態（ローカルストレージベース）
 interface AuthState {
-  isAccessCodeVerified: boolean;
-  isLoggedIn: boolean;
-  user: User | null;
-  accessCode: string | null;
+  isAccessCodeVerified: boolean;  // sessionStorage: 'accessCode'
+  isLoggedIn: boolean;            // sessionStorage: 'user' の存在で判定
+  user: User | null;              // sessionStorage: 'user' (JSON)
+  accessCode: string | null;      // sessionStorage: 'accessCode'
 }
 
 // ユーザー情報（実装版）
@@ -407,6 +411,67 @@ const QuizPresenter: React.FC<QuizPresenterProps> = ({
     </QuizBoard>
   );
 };
+```
+
+**認証サービス設計**
+```typescript
+// authService.ts - 統合認証管理サービス
+class AuthService {
+  private baseURL: string = `${API_BASE_URL}/api/v1/auth`;
+
+  // アクセスコード検証
+  async verifyAccessCode(accessCode: string): Promise<VerifyAccessCodeResponse> {
+    const response = await fetch(`${this.baseURL}/verify-access-code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessCode }),
+      credentials: 'include',
+    });
+    return response.json();
+  }
+
+  // ユーザーログイン（ローカルストレージ管理）
+  async login(username: string, password: string): Promise<LoginResponse> {
+    const response = await fetch(`${this.baseURL}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+      credentials: 'include',
+    });
+    
+    const result = await response.json();
+    
+    // ログイン成功時にユーザー情報をローカルストレージに保存
+    if (result.user) {
+      this.saveUserToStorage(result.user);
+    }
+    return result;
+  }
+
+  // ローカル認証状態管理
+  saveUserToStorage(user: any): void {
+    sessionStorage.setItem('user', JSON.stringify(user));
+  }
+
+  getUserFromStorage(): any | null {
+    const userStr = sessionStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : null;
+  }
+
+  isAuthenticated(): boolean {
+    return this.getAccessCodeFromStorage() !== null && 
+           this.getUserFromStorage() !== null;
+  }
+
+  // 現在のユーザー情報取得（ローカルストレージから）
+  async getMe(): Promise<GetMeResponse> {
+    const user = this.getUserFromStorage();
+    if (user) {
+      return { user };
+    }
+    throw new Error('ユーザー情報が見つかりません。再ログインが必要です。');
+  }
+}
 ```
 
 **カスタムHook設計**
@@ -784,22 +849,37 @@ func (h *AuthHandler) Login(c *gin.Context) {
         return
     }
 
-    var req struct {
-        Username string `json:"username" binding:"required"`
-        Password string `json:"password" binding:"required"`
+    // カスタムJSONパース（バリデーションエラー回避）
+    body, err := c.GetRawData()
+    if err != nil {
+        c.JSON(400, gin.H{"error": "Failed to read request body"})
+        return
     }
-    
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(400, gin.H{"error": "Invalid request format"})
+
+    var requestData map[string]interface{}
+    if err := json.Unmarshal(body, &requestData); err != nil {
+        c.JSON(400, gin.H{"error": "Invalid JSON format"})
+        return
+    }
+
+    username, usernameExists := requestData["username"].(string)
+    password, passwordExists := requestData["password"].(string)
+
+    if !usernameExists || !passwordExists || username == "" || password == "" {
+        c.JSON(400, gin.H{"error": "username and password are required"})
         return
     }
     
     // ユーザー認証
-    user, err := h.authUseCase.AuthenticateUser(c.Request.Context(), req.Username, req.Password)
+    user, err := h.authUseCase.AuthenticateUser(c.Request.Context(), username, password)
     if err != nil {
+        h.logLoginAttempt(c, username, false)
         c.JSON(401, gin.H{"error": "無効なユーザー名またはパスワードです"})
         return
     }
+    
+    // ログイン成功ログ
+    h.logLoginAttempt(c, username, true)
     
     // セッションにユーザー情報を保存
     session.Set("user_id", user.ID)
@@ -811,6 +891,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
         "user":    user,
         "message": "ログインが成功しました",
     })
+}
+
+// 現在のユーザー情報取得（フロントエンドではローカルストレージから取得）
+func (h *AuthHandler) GetMe(c *gin.Context) {
+    // 注意: 現在の実装では/meエンドポイントはフロントエンドで
+    // ローカルストレージから直接取得するため、このエンドポイントは
+    // 実際には使用されない。バックエンドの認証状態はセッションで管理。
 }
 
 // 管理者用ユーザー管理API（管理者権限チェック付き）

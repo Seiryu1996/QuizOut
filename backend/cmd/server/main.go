@@ -159,13 +159,12 @@ func main() {
 		{
 			auth.POST("/verify-access-code", authHandler.VerifyAccessCode)
 			auth.POST("/login", authHandler.Login)
-			auth.GET("/me", accessCodeMiddleware.RequireUserAuth(), authHandler.GetMe)
+			auth.GET("/me", authHandler.GetMe)
 		}
 
 		// 管理者専用エンドポイント（新しい認証システム）
 		adminAuth := v1.Group("/admin")
-		adminAuth.Use(accessCodeMiddleware.RequireUserAuth())
-		adminAuth.Use(middleware.AdminMiddleware(firebaseClient.UserRepo))
+		adminAuth.Use(middleware.AdminSessionMiddleware(firebaseClient.UserRepo))
 		{
 			// ユーザー管理
 			adminAuth.GET("/users", authHandler.GetUsers)

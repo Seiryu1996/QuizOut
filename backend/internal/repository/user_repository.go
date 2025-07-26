@@ -194,6 +194,28 @@ func (r *FirebaseUserRepository) GetUserByAccessCode(ctx context.Context, access
 	return &user, nil
 }
 
+// GetAll すべてのユーザーを取得
+func (r *FirebaseUserRepository) GetAll(ctx context.Context) ([]*domain.User, error) {
+	iter := r.client.Collection("users").Documents(ctx)
+	var users []*domain.User
+
+	for {
+		doc, err := iter.Next()
+		if err != nil {
+			break
+		}
+
+		var user domain.User
+		if err := doc.DataTo(&user); err != nil {
+			continue
+		}
+
+		users = append(users, &user)
+	}
+
+	return users, nil
+}
+
 // generateUserID ユーザーIDを生成
 func generateUserID() string {
 	bytes := make([]byte, 16)

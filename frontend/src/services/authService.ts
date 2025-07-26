@@ -51,25 +51,26 @@ class AuthService {
       throw new Error(errorData.message || 'ログインに失敗しました');
     }
 
-    return response.json();
-  }
-
-  // 現在のユーザー情報を取得
-  async getMe(): Promise<GetMeResponse> {
-    const response = await fetch(`${this.baseURL}/me`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include',
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: 'Network error' }));
-      throw new Error(errorData.message || 'ユーザー情報の取得に失敗しました');
+    const result = await response.json();
+    
+    // ログイン成功時にユーザー情報をローカルストレージに保存
+    if (result.user) {
+      this.saveUserToStorage(result.user);
     }
 
-    return response.json();
+    return result;
+  }
+
+  // 現在のユーザー情報を取得（ローカルストレージから）
+  async getMe(): Promise<GetMeResponse> {
+    // ローカルストレージからユーザー情報を取得
+    const user = this.getUserFromStorage();
+    if (user) {
+      return { user };
+    }
+
+    // ローカルストレージにユーザー情報がない場合はエラー
+    throw new Error('ユーザー情報が見つかりません。再ログインが必要です。');
   }
 
   // ログアウト（セッションクリア）
@@ -78,6 +79,7 @@ class AuthService {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('accessCode');
       sessionStorage.removeItem('accessCode');
+      sessionStorage.removeItem('user');
     }
   }
 
@@ -94,6 +96,27 @@ class AuthService {
       return sessionStorage.getItem('accessCode');
     }
     return null;
+  }
+
+  // ユーザー情報をローカルストレージに保存
+  saveUserToStorage(user: any): void {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('user', JSON.stringify(user));
+    }
+  }
+
+  // ローカルストレージからユーザー情報を取得
+  getUserFromStorage(): any | null {
+    if (typeof window !== 'undefined') {
+      const userStr = sessionStorage.getItem('user');
+      return userStr ? JSON.parse(userStr) : null;
+    }
+    return null;
+  }
+
+  // 認証状態をチェック
+  isAuthenticated(): boolean {
+    return this.getAccessCodeFromStorage() !== null && this.getUserFromStorage() !== null;
   }
 }
 
