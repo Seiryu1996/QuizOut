@@ -7,15 +7,16 @@ const createJestConfig = nextJest({
 
 // Jest のカスタム設定を追加
 const customJestConfig = {
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/src/test/setup.ts'],
   testEnvironment: 'jsdom',
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
     '!src/test/**/*',
+    '!src/**/__tests__/**/*',
   ],
   coverageThreshold: {
     global: {
@@ -25,6 +26,17 @@ const customJestConfig = {
       statements: 70,
     },
   },
+  testPathIgnorePatterns: [
+    '<rootDir>/.next/',
+    '<rootDir>/node_modules/',
+  ],
+  transformIgnorePatterns: [
+    '/node_modules/(?!(.*\\.esm\\.js$))',
+  ],
+  testMatch: [
+    '<rootDir>/src/**/__tests__/**/*.{js,jsx,ts,tsx}',
+    '<rootDir>/src/**/*.(test|spec).{js,jsx,ts,tsx}',
+  ],
 };
 
 // createJestConfig は非同期なので、次のように記述
