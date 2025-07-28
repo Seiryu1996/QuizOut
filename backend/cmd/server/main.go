@@ -73,7 +73,6 @@ func main() {
 	accessCodeRepo := repository.NewFileAccessCodeRepository("/app/configs/access_codes.txt")
 	authUseCase := usecase.NewAuthUseCase(accessCodeRepo, firebaseClient.UserRepo)
 	authHandler := handler.NewAuthHandler(authUseCase)
-	accessCodeMiddleware := middleware.NewAccessCodeMiddleware(authUseCase)
 
 	// ヘルスチェック
 	router.GET("/health", func(c *gin.Context) {
@@ -84,7 +83,7 @@ func main() {
 	})
 
 	// WebSocket エンドポイント
-	router.GET("/ws", authMiddleware.OptionalAuth(), func(c *gin.Context) {
+	router.GET("/ws", middleware.WebSocketRateLimit(), authMiddleware.OptionalAuth(), func(c *gin.Context) {
 		userID, _ := middleware.GetUserID(c)
 		if userID == "" {
 			userID = "anonymous_" + generateRandomID()
@@ -156,16 +155,16 @@ func main() {
 	{
 		// アクセスコード認証エンドポイント
 		auth := v1.Group("/auth")
+		auth.Use(middleware.LoginRateLimit()) // ログイン専用レート制限
 		{
 			auth.POST("/verify-access-code", authHandler.VerifyAccessCode)
 			auth.POST("/login", authHandler.Login)
-			auth.GET("/me", accessCodeMiddleware.RequireUserAuth(), authHandler.GetMe)
+			auth.GET("/me", authHandler.GetMe)
 		}
 
 		// 管理者専用エンドポイント（新しい認証システム）
 		adminAuth := v1.Group("/admin")
-		adminAuth.Use(accessCodeMiddleware.RequireUserAuth())
-		adminAuth.Use(middleware.AdminMiddleware(firebaseClient.UserRepo))
+		adminAuth.Use(middleware.AdminSessionMiddleware(firebaseClient.UserRepo))
 		{
 			// ユーザー管理
 			adminAuth.GET("/users", authHandler.GetUsers)
@@ -175,6 +174,7 @@ func main() {
 		}
 		
 		// 認証不要のエンドポイント
+		v1.Use(middleware.APIRateLimit()) // API呼び出し制限
 		v1.GET("/sessions/:id/info", sessionHandler.GetSessionInfo)
 		v1.GET("/sessions/:id/status", sessionHandler.GetSessionStatus)
 
@@ -191,26 +191,25 @@ func main() {
 			authRequired.POST("/sessions/:id/answers", quizHandler.SubmitAnswer)
 		}
 
-		// 管理者専用のエンドポイント
-		admin := v1.Group("/admin")
-		admin.Use(authMiddleware.RequireAuth())
-		admin.Use(authMiddleware.RequireAdmin())
+		// 管理者専用のエンドポイント（セッションベース認証）
+		adminSession := v1.Group("/admin")
+		adminSession.Use(middleware.AdminSessionMiddleware(firebaseClient.UserRepo))
 		{
 			// セッション管理
-			admin.POST("/sessions", adminHandler.CreateSession)
-			admin.PUT("/sessions/:id/control", adminHandler.ControlSession)
-			admin.GET("/sessions/:id/stats", adminHandler.GetSessionStats)
-			admin.GET("/sessions/:id/results", adminHandler.GetResults)
-			admin.GET("/sessions/:id/export", adminHandler.ExportResults)
+			adminSession.POST("/sessions", adminHandler.CreateSession)
+			adminSession.PUT("/sessions/:id/control", adminHandler.ControlSession)
+			adminSession.GET("/sessions/:id/stats", adminHandler.GetSessionStats)
+			adminSession.GET("/sessions/:id/results", adminHandler.GetResults)
+			adminSession.GET("/sessions/:id/export", adminHandler.ExportResults)
 
 			// クイズ管理
-			admin.POST("/sessions/:id/generate-question", quizHandler.GenerateQuestion)
-			admin.POST("/sessions/:id/process-results", quizHandler.ProcessRoundResults)
-			admin.POST("/sessions/:id/next-round", quizHandler.NextRound)
-			admin.POST("/sessions/:id/skip-question", adminHandler.SkipQuestion)
+			adminSession.POST("/sessions/:id/generate-question", quizHandler.GenerateQuestion)
+			adminSession.POST("/sessions/:id/process-results", quizHandler.ProcessRoundResults)
+			adminSession.POST("/sessions/:id/next-round", quizHandler.NextRound)
+			adminSession.POST("/sessions/:id/skip-question", adminHandler.SkipQuestion)
 
 			// 敗者復活戦
-			admin.POST("/sessions/:id/revival", adminHandler.StartRevival)
+			adminSession.POST("/sessions/:id/revival", adminHandler.StartRevival)
 		}
 	}
 

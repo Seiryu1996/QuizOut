@@ -11,6 +11,7 @@ export default function QuizSelectionPage() {
   const [sessionId, setSessionId] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isJoining, setIsJoining] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     loadUserInfo();
@@ -20,6 +21,7 @@ export default function QuizSelectionPage() {
     try {
       const response = await authService.getMe();
       setUser(response.user);
+      setIsAdmin(response.user.isAdmin || false);
     } catch (error) {
       console.error('Failed to load user info:', error);
       // 認証エラーの場合はアクセスコードページにリダイレクト
@@ -157,15 +159,17 @@ export default function QuizSelectionPage() {
           </div>
         </div>
 
-        {/* 管理者用リンク */}
-        <div className="text-center mb-6">
-          <button
-            onClick={handleGoToAdmin}
-            className="text-blue-600 hover:text-blue-800 underline font-medium"
-          >
-            管理者の方はこちら
-          </button>
-        </div>
+        {/* 管理者用リンク - 管理者のみ表示 */}
+        {isAdmin && (
+          <div className="text-center mb-6">
+            <button
+              onClick={handleGoToAdmin}
+              className="text-blue-600 hover:text-blue-800 underline font-medium"
+            >
+              管理者ダッシュボード
+            </button>
+          </div>
+        )}
 
         {/* フッター */}
         <div className="text-center text-gray-500 text-sm">

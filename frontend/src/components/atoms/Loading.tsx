@@ -18,11 +18,12 @@ export const Loading: React.FC<LoadingProps> = ({
   };
 
   return (
-    <div className={`flex flex-col items-center justify-center ${className}`}>
-      <div className={`animate-spin rounded-full border-b-2 border-primary-500 ${sizeClasses[size]}`} />
+    <div className={`flex flex-col items-center justify-center ${className}`} role="status" aria-live="polite">
+      <div className={`animate-spin rounded-full border-b-2 border-primary-500 ${sizeClasses[size]}`} aria-hidden="true" />
       {text && (
         <p className="mt-3 text-sm text-gray-600">{text}</p>
       )}
+      {!text && <span className="sr-only">読み込み中...</span>}
     </div>
   );
 };

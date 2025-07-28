@@ -20,7 +20,10 @@
       "Bash(npx jest:*)",
       "Bash(npx tsc:*)",
       "Bash(go build:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(timeout 30 npx jest src/components/atoms/__tests__/Button.test.tsx --verbose)"
     ],
     "deny": []
   }
