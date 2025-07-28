@@ -797,6 +797,255 @@ jobs:
           file: ./coverage.out
 ```
 
+## 追加テスト仕様
+
+### 6. Handler テスト
+
+#### 6.1 Auth Handler
+```go
+// internal/handler/auth_handler_test.go
+func TestAuthHandler(t *testing.T) {
+    t.Run("アクセスコード検証APIが正常に動作すること", func(t *testing.T) {
+        // 有効なアクセスコードでの検証成功
+        // 無効なアクセスコードでの検証失敗
+        // 空のアクセスコードでのバリデーションエラー
+    })
+    
+    t.Run("ユーザーログインAPIが正常に動作すること", func(t *testing.T) {
+        // 有効な認証情報でのログイン成功
+        // 無効な認証情報でのログイン失敗
+        // 空の認証情報でのバリデーションエラー
+    })
+    
+    t.Run("一括ユーザー登録APIが正常に動作すること", func(t *testing.T) {
+        // CSVファイルでの一括ユーザー登録
+        // 不正なCSV形式での登録失敗
+        // 重複ユーザー名での登録失敗
+    })
+}
+```
+
+#### 6.2 Quiz Handler
+```go
+// internal/handler/quiz_handler_test.go
+func TestQuizHandler(t *testing.T) {
+    t.Run("問題取得APIが正常に動作すること", func(t *testing.T) {
+        // 現在の問題取得
+        // 存在しないセッションでの問題取得失敗
+        // 認証されていないユーザーでのアクセス拒否
+    })
+    
+    t.Run("回答送信APIが正常に動作すること", func(t *testing.T) {
+        // 正解回答の送信と結果取得
+        // 不正解回答の送信と結果取得
+        // 無効な選択肢での回答エラー
+        // 制限時間超過での回答拒否
+    })
+    
+    t.Run("ゲーム参加APIが正常に動作すること", func(t *testing.T) {
+        // セッションへの参加成功
+        // 満員セッションへの参加失敗
+        // 重複参加の拒否
+        // 終了済みセッションへの参加拒否
+    })
+}
+```
+
+#### 6.3 Session Handler
+```go
+// internal/handler/session_handler_test.go
+func TestSessionHandler(t *testing.T) {
+    t.Run("セッション作成APIが正常に動作すること", func(t *testing.T) {
+        // 管理者権限でのセッション作成
+        // 一般ユーザーでのセッション作成拒否
+        // 無効なパラメータでの作成失敗
+    })
+    
+    t.Run("セッション制御APIが正常に動作すること", func(t *testing.T) {
+        // セッション開始・一時停止・終了
+        // 権限のないユーザーでの制御拒否
+        // 無効な状態遷移でのエラー
+    })
+    
+    t.Run("参加者一覧取得APIが正常に動作すること", func(t *testing.T) {
+        // アクティブ参加者一覧取得
+        // 全参加者一覧取得
+        // セッション別参加者取得
+    })
+}
+```
+
+### 7. Middleware テスト
+
+#### 7.1 認証Middleware
+```go
+// internal/middleware/auth_test.go
+func TestAuthMiddleware(t *testing.T) {
+    t.Run("JWTトークン検証が正常に動作すること", func(t *testing.T) {
+        // 有効なトークンでのアクセス許可
+        // 無効なトークンでのアクセス拒否
+        // 期限切れトークンでのアクセス拒否
+        // トークンなしでのアクセス拒否
+    })
+    
+    t.Run("セッション認証が正常に動作すること", func(t *testing.T) {
+        // セッション参加者の認証
+        // 非参加者のアクセス拒否
+        // セッション終了後のアクセス拒否
+    })
+}
+```
+
+#### 7.2 管理者Middleware
+```go
+// internal/middleware/admin_test.go
+func TestAdminMiddleware(t *testing.T) {
+    t.Run("管理者権限検証が正常に動作すること", func(t *testing.T) {
+        // 管理者ユーザーのアクセス許可
+        // 一般ユーザーのアクセス拒否
+        // ゲスト用アクセスの拒否
+    })
+}
+```
+
+### 8. セキュリティテスト
+
+#### 8.1 認証・認可テスト
+```go
+// tests/security/auth_security_test.go
+func TestAuthSecurity(t *testing.T) {
+    t.Run("SQLインジェクション攻撃が防御できること", func(t *testing.T) {
+        // ユーザー名フィールドでのSQLインジェクション試行
+        // パスワードフィールドでのSQLインジェクション試行
+        // 検索パラメータでのSQLインジェクション試行
+    })
+    
+    t.Run("XSS攻撃が防御できること", func(t *testing.T) {
+        // ユーザー名でのXSSスクリプト挿入試行
+        // 表示名でのXSSスクリプト挿入試行
+        // 回答内容でのXSSスクリプト挿入試行
+    })
+    
+    t.Run("CSRF攻撃が防御できること", func(t *testing.T) {
+        // CSRFトークンなしでのフォーム送信拒否
+        // 無効なCSRFトークンでの送信拒否
+        // 期限切れCSRFトークンでの送信拒否
+    })
+    
+    t.Run("レート制限が正常に動作すること", func(t *testing.T) {
+        // ログイン試行の制限
+        // API呼び出しの制限
+        // WebSocket接続の制限
+    })
+}
+```
+
+### 9. データ整合性テスト
+
+#### 9.1 同時実行テスト
+```go
+// tests/concurrency/concurrent_test.go
+func TestConcurrentOperations(t *testing.T) {
+    t.Run("同時回答送信での整合性確保", func(t *testing.T) {
+        // 100人が同時に回答送信
+        // 回答順序の保証
+        // スコア計算の整合性
+        // 脱落処理の正確性
+    })
+    
+    t.Run("同時参加での整合性確保", func(t *testing.T) {
+        // 定員ギリギリでの同時参加
+        // 参加者数の正確性
+        // 重複参加の防止
+    })
+    
+    t.Run("管理者操作との同時実行", func(t *testing.T) {
+        // 参加者の回答中にゲーム終了
+        // 問題配信中にセッション操作
+        // 敗者復活戦中の通常ゲーム操作
+    })
+}
+```
+
+### 10. パフォーマンス詳細テスト
+
+#### 10.1 大規模負荷テスト
+```go
+// tests/performance/large_scale_test.go
+func TestLargeScalePerformance(t *testing.T) {
+    t.Run("200人同時接続での安定性", func(t *testing.T) {
+        // 200WebSocket接続の確立
+        // 同時メッセージ配信のレスポンス時間
+        // メモリ使用量の監視
+        // CPU使用率の監視
+    })
+    
+    t.Run("1000問連続生成での性能", func(t *testing.T) {
+        // AI API連続呼び出し
+        // レスポンス時間の測定
+        // エラー率の監視
+        // API制限の処理
+    })
+    
+    t.Run("長時間運用での安定性", func(t *testing.T) {
+        // 24時間連続運用
+        // メモリリークの監視
+        // 接続プールの管理
+        // ガベージコレクションの影響
+    })
+}
+```
+
+### 11. 障害復旧テスト
+
+#### 11.1 障害シナリオテスト
+```go
+// tests/failover/disaster_recovery_test.go
+func TestDisasterRecovery(t *testing.T) {
+    t.Run("データベース接続障害からの復旧", func(t *testing.T) {
+        // Firebase接続切断シミュレーション
+        // 自動再接続の確認
+        // データ整合性の保証
+        // エラーハンドリングの確認
+    })
+    
+    t.Run("AI API障害からの復旧", func(t *testing.T) {
+        // Gemini API障害シミュレーション
+        // OpenAIへの自動切り替え
+        // 全API障害時の処理
+        // 復旧時の元API復帰
+    })
+    
+    t.Run("WebSocket切断からの復旧", func(t *testing.T) {
+        // 大量クライアントの同時切断
+        // 自動再接続処理
+        // 状態同期の確認
+        // メッセージ配信の継続性
+    })
+}
+```
+
+### 12. 国際化・アクセシビリティテスト
+
+#### 12.1 多言語対応テスト
+```go
+// tests/i18n/internationalization_test.go
+func TestInternationalization(t *testing.T) {
+    t.Run("多言語エラーメッセージ", func(t *testing.T) {
+        // 日本語エラーメッセージ
+        // 英語エラーメッセージ
+        // 文字エンコーディングの確認
+        // 特殊文字の処理
+    })
+    
+    t.Run("Unicode文字の処理", func(t *testing.T) {
+        // 絵文字を含むユーザー名
+        // 多バイト文字の問題文
+        // 特殊記号の選択肢
+    })
+}
+```
+
 ## テスト実行コマンド
 
 ```bash
@@ -812,6 +1061,15 @@ make test-integration
 # 負荷テスト実行
 make test-load
 
+# セキュリティテスト実行
+make test-security
+
+# パフォーマンステスト実行
+make test-performance
+
+# 障害復旧テスト実行
+make test-failover
+
 # カバレッジ測定
 make test-coverage
 
@@ -823,4 +1081,10 @@ go test -v ./internal/usecase/
 
 # テスト監視モード
 go test -v ./internal/... -watch
+
+# 並列テスト実行
+go test -v ./internal/... -parallel 4
+
+# レースコンディション検出
+go test -v ./internal/... -race
 ```

@@ -14,6 +14,8 @@ export interface User {
   username: string;
   displayName: string;
   email?: string;
+  isAdmin?: boolean;
+  role?: string;
   createdAt: string;
   updatedAt: string;
 }

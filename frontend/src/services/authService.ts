@@ -61,16 +61,22 @@ class AuthService {
     return result;
   }
 
-  // 現在のユーザー情報を取得（ローカルストレージから）
+  // 現在のユーザー情報を取得（サーバーから）
   async getMe(): Promise<GetMeResponse> {
-    // ローカルストレージからユーザー情報を取得
-    const user = this.getUserFromStorage();
-    if (user) {
-      return { user };
+    const response = await fetch(`${this.baseURL}/me`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', // セッションクッキーを含める
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Network error' }));
+      throw new Error(errorData.error || 'ユーザー情報の取得に失敗しました');
     }
 
-    // ローカルストレージにユーザー情報がない場合はエラー
-    throw new Error('ユーザー情報が見つかりません。再ログインが必要です。');
+    return response.json();
   }
 
   // ログアウト（セッションクリア）

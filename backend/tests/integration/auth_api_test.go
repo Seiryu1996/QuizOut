@@ -110,6 +110,14 @@ func (m *MockUserRepository) BulkCreateUsers(ctx context.Context, users []reposi
 	return args.Error(0)
 }
 
+func (m *MockUserRepository) GetAll(ctx context.Context) ([]*domain.User, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*domain.User), args.Error(1)
+}
+
 // setupTestRouter テスト用ルーターを設定（モック付き）
 func setupTestRouterWithMocks(mockAccessCodeRepo *MockAccessCodeRepository, mockUserRepo *MockUserRepository) *gin.Engine {
 	gin.SetMode(gin.TestMode)

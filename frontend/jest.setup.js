@@ -1,5 +1,9 @@
 import '@testing-library/jest-dom';
 
+// Polyfill for TextEncoder/TextDecoder (required for MSW)
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder;
+
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
   useRouter: jest.fn(() => ({

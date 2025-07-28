@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "msw": "^1.3.2"
+  }
+}

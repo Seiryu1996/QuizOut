@@ -1,14 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
+import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { useAPI } from '@/hooks/useAPI';
 import { Button } from '@/components/atoms/Button';
 
 export default function AdminPage() {
   const router = useRouter();
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, isAdmin, loading, error } = useAdminAuth();
   const api = useAPI();
   
   const [sessionTitle, setSessionTitle] = useState('');
@@ -17,6 +17,14 @@ export default function AdminPage() {
   const [revivalEnabled, setRevivalEnabled] = useState(true);
   const [revivalCount, setRevivalCount] = useState(3);
   const [isCreating, setIsCreating] = useState(false);
+
+  // 認証状態に基づくリダイレクト処理
+  useEffect(() => {
+    // ローディング完了後、認証されていない場合のみリダイレクト
+    if (!loading && !isAuthenticated && !error) {
+      router.push('/access-code');
+    }
+  }, [loading, isAuthenticated, error, router]);
 
   const handleCreateSession = async () => {
     if (!sessionTitle.trim()) {
@@ -35,8 +43,8 @@ export default function AdminPage() {
       });
 
       if (response.success && response.data) {
-        alert(`セッションを作成しました\nセッションID: ${response.data.id}`);
-        setSessionTitle('');
+        // セッション作成成功時は管理画面に遷移
+        router.push(`/admin/session/${response.data.id}`);
       } else {
         alert('セッションの作成に失敗しました');
       }
@@ -48,10 +56,67 @@ export default function AdminPage() {
     }
   };
 
+  // ローディング中
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  // 認証エラー時の表示
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md mx-auto text-center p-6">
+          <div className="text-6xl mb-4">❌</div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+            認証エラー
+          </h2>
+          <p className="text-gray-600 mb-4">
+            認証情報の取得に失敗しました。
+          </p>
+          <p className="text-red-600 text-sm mb-4">{error}</p>
+          <button
+            onClick={() => router.push('/access-code')}
+            className="btn-primary"
+          >
+            ログイン画面に戻る
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 未認証の場合（リダイレクト処理中）
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  // 管理者権限がない場合
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md mx-auto text-center p-6">
+          <div className="text-6xl mb-4">🚫</div>
+          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+            アクセス権限がありません
+          </h2>
+          <p className="text-gray-600 mb-4">
+            このページは管理者のみアクセス可能です。
+          </p>
+          <button
+            onClick={() => router.push('/')}
+            className="btn-primary"
+          >
+            ホームに戻る
+          </button>
+        </div>
       </div>
     );
   }

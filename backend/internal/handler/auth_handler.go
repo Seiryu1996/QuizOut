@@ -196,8 +196,22 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 
 	log.Printf("GetMe: User found: %s (%s)", user.Username, user.ID)
 
+	// ユーザー情報にロール情報を追加
+	response := gin.H{
+		"id":          user.ID,
+		"username":    user.Username,
+		"displayName": user.DisplayName,
+		"email":       user.Email,
+		"isAnonymous": user.IsAnonymous,
+		"accessCode":  user.AccessCode,
+		"createdAt":   user.CreatedAt,
+		"lastLoginAt": user.LastLoginAt,
+		"isAdmin":     user.IsAdmin(),
+		"role":        user.GetRole(),
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"user": user,
+		"user": response,
 	})
 }
 
