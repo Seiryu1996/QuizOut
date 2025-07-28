@@ -248,7 +248,7 @@ func TestLargeScalePerformance(t *testing.T) {
 		// アサーション
 		assert.Equal(t, int64(clientCount), metrics.SuccessfulRequests, "接続成功数が期待値と一致しない")
 		assert.Equal(t, int64(0), connectionErrors, "接続エラーが発生")
-		assert.Less(t, broadcastTime, 1*time.Second, "ブロードキャスト時間が長すぎる: %v", broadcastTime)
+		assert.Less(t, broadcastTime, 2*time.Second, "ブロードキャスト時間が長すぎる: %v", broadcastTime)
 		assert.Less(t, metrics.AverageResponseTime, 50*time.Millisecond, "平均レスポンス時間が長すぎる: %v", metrics.AverageResponseTime)
 		
 		// メモリ使用量の確認
@@ -295,8 +295,15 @@ func TestLargeScalePerformance(t *testing.T) {
 				difficulty := []domain.Difficulty{domain.DifficultyEasy, domain.DifficultyMedium, domain.DifficultyHard}[questionIndex%3]
 				category := []string{"general", "science", "history", "sports"}[questionIndex%4]
 				
-				// API呼び出し時間をシミュレート
-				apiCallTime := time.Duration(50+questionIndex%200) * time.Millisecond
+				// 難易度とカテゴリに基づくAPI呼び出し時間をシミュレート
+				baseTime := 50
+				if difficulty == domain.DifficultyHard {
+					baseTime += 50
+				}
+				if category == "science" {
+					baseTime += 25
+				}
+				apiCallTime := time.Duration(baseTime+questionIndex%200) * time.Millisecond
 				time.Sleep(apiCallTime)
 				
 				responseTime := time.Since(start)

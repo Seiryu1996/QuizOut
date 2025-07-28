@@ -1,155 +1,98 @@
-import { render, screen, act } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { Timer } from '../Timer';
 
-// タイマーのテストでsetIntervalをモック化
-jest.useFakeTimers();
-
 describe('Timer Component', () => {
-  afterEach(() => {
-    jest.clearAllTimers();
+  test('時間が正しく表示されること', () => {
+    render(<Timer timeRemaining={30} totalTime={30} />);
+    
+    // 時間の表示確認
+    expect(screen.getByText('30')).toBeInTheDocument();
+    expect(screen.getByText('残り時間')).toBeInTheDocument();
   });
 
-  test('制限時間が正常にカウントダウンされること', () => {
-    const mockOnTimeUp = jest.fn();
-    render(<Timer initialTime={30} onTimeUp={mockOnTimeUp} />);
+  test('時間切れ時の表示が正しいこと', () => {
+    render(<Timer timeRemaining={0} totalTime={30} />);
     
-    // 初期値確認
-    expect(screen.getByText('00:30')).toBeInTheDocument();
-    
-    // 1秒経過
-    act(() => {
-      jest.advanceTimersByTime(1000);
-    });
-    expect(screen.getByText('00:29')).toBeInTheDocument();
-    
-    // 5秒経過
-    act(() => {
-      jest.advanceTimersByTime(4000);
-    });
-    expect(screen.getByText('00:25')).toBeInTheDocument();
+    expect(screen.getByText('0')).toBeInTheDocument();
+    expect(screen.getByText('時間切れ')).toBeInTheDocument();
   });
 
-  test('0になったらonTimeUpが呼ばれること', () => {
-    const mockOnTimeUp = jest.fn();
-    render(<Timer initialTime={3} onTimeUp={mockOnTimeUp} />);
+  test('プログレスバーの幅が正しく計算されること', () => {
+    const { container } = render(<Timer timeRemaining={15} totalTime={30} />);
     
-    // 3秒経過させる
-    act(() => {
-      jest.advanceTimersByTime(3000);
-    });
-    
-    expect(screen.getByText('00:00')).toBeInTheDocument();
-    expect(mockOnTimeUp).toHaveBeenCalledTimes(1);
+    // プログレスバーの幅は50%になるはず
+    const progressBar = container.querySelector('.h-2.rounded-full.transition-all');
+    expect(progressBar).toHaveStyle('width: 50%');
   });
 
-  test('時間フォーマットが正しいこと', () => {
-    const { rerender } = render(<Timer initialTime={65} />);
+  test('低い時間での警告色が適用されること', () => {
+    const { container } = render(<Timer timeRemaining={3} totalTime={30} />);
     
-    // 1分5秒
-    expect(screen.getByText('01:05')).toBeInTheDocument();
-    
-    // 10分30秒をテスト
-    rerender(<Timer initialTime={630} />);
-    expect(screen.getByText('10:30')).toBeInTheDocument();
-    
-    // 1分未満をテスト
-    rerender(<Timer initialTime={45} />);
-    expect(screen.getByText('00:45')).toBeInTheDocument();
+    // 5秒以下で警告色とアニメーションが適用される
+    const timeDisplay = container.querySelector('.text-4xl.font-bold');
+    expect(timeDisplay).toHaveClass('text-warning-600');
+    expect(timeDisplay).toHaveClass('animate-pulse');
   });
 
-  test('10秒未満で警告色になること', () => {
-    render(<Timer initialTime={15} />);
+  test('時間切れ時の危険色が適用されること', () => {
+    const { container } = render(<Timer timeRemaining={0} totalTime={30} />);
     
-    let timer = screen.getByTestId('timer');
-    expect(timer).not.toHaveClass('text-red-600');
-    
-    // 6秒経過させて9秒にする
-    act(() => {
-      jest.advanceTimersByTime(6000);
-    });
-    
-    timer = screen.getByTestId('timer');
-    expect(timer).toHaveClass('text-red-600');
-    expect(screen.getByText('00:09')).toBeInTheDocument();
+    const timeDisplay = container.querySelector('.text-4xl.font-bold');
+    expect(timeDisplay).toHaveClass('text-danger-600');
   });
 
-  test('一時停止機能が正常に動作すること', () => {
-    const { rerender } = render(<Timer initialTime={30} isPaused={false} />);
+  test('通常時の色が適用されること', () => {
+    const { container } = render(<Timer timeRemaining={20} totalTime={30} />);
     
-    // 2秒経過
-    act(() => {
-      jest.advanceTimersByTime(2000);
-    });
-    expect(screen.getByText('00:28')).toBeInTheDocument();
-    
-    // 一時停止
-    rerender(<Timer initialTime={30} isPaused={true} />);
-    
-    // さらに2秒経過しても時間は進まない
-    act(() => {
-      jest.advanceTimersByTime(2000);
-    });
-    expect(screen.getByText('00:28')).toBeInTheDocument();
+    const timeDisplay = container.querySelector('.text-4xl.font-bold');
+    expect(timeDisplay).toHaveClass('text-primary-600');
   });
 
-  test('リセット機能が正常に動作すること', () => {
-    const { rerender } = render(<Timer initialTime={30} key="timer1" />);
-    
-    // 5秒経過
-    act(() => {
-      jest.advanceTimersByTime(5000);
-    });
-    expect(screen.getByText('00:25')).toBeInTheDocument();
-    
-    // キーを変更してリセット
-    rerender(<Timer initialTime={30} key="timer2" />);
-    expect(screen.getByText('00:30')).toBeInTheDocument();
-  });
+  test('プログレスバーの色が時間に応じて変わること', () => {
+    // 40%より大きい：緑色
+    const { container: container1 } = render(<Timer timeRemaining={25} totalTime={30} />);
+    let progressBar = container1.querySelector('.h-2.rounded-full.transition-all');
+    expect(progressBar).toHaveClass('bg-success-500');
 
-  test('0秒で開始した場合即座にonTimeUpが呼ばれること', () => {
-    const mockOnTimeUp = jest.fn();
-    render(<Timer initialTime={0} onTimeUp={mockOnTimeUp} />);
-    
-    expect(screen.getByText('00:00')).toBeInTheDocument();
-    
-    // 次のティックで呼ばれることを確認
-    act(() => {
-      jest.advanceTimersByTime(100);
-    });
-    
-    expect(mockOnTimeUp).toHaveBeenCalledTimes(1);
-  });
+    // 50%は40%より大きいので緑色
+    const { container: container2 } = render(<Timer timeRemaining={15} totalTime={30} />);
+    progressBar = container2.querySelector('.h-2.rounded-full.transition-all');
+    expect(progressBar).toHaveClass('bg-success-500');
 
-  test('コンポーネントのアンマウント時にタイマーがクリアされること', () => {
-    const { unmount } = render(<Timer initialTime={30} />);
-    
-    // タイマーが動作中であることを確認
-    act(() => {
-      jest.advanceTimersByTime(1000);
-    });
-    expect(screen.getByText('00:29')).toBeInTheDocument();
-    
-    // コンポーネントをアンマウント
-    unmount();
-    
-    // タイマーがクリアされていることを確認（エラーが発生しないこと）
-    act(() => {
-      jest.advanceTimersByTime(5000);
-    });
+    // 21-40%：黄色
+    const { container: container3 } = render(<Timer timeRemaining={10} totalTime={30} />);
+    progressBar = container3.querySelector('.h-2.rounded-full.transition-all');
+    expect(progressBar).toHaveClass('bg-warning-500');
+
+    // 20%以下：赤色
+    const { container: container4 } = render(<Timer timeRemaining={5} totalTime={30} />);
+    progressBar = container4.querySelector('.h-2.rounded-full.transition-all');
+    expect(progressBar).toHaveClass('bg-danger-500');
   });
 
   test('カスタムクラス名が適用されること', () => {
-    render(<Timer initialTime={30} className="custom-timer" />);
+    const { container } = render(<Timer timeRemaining={30} totalTime={30} className="custom-timer" />);
     
-    const timer = screen.getByTestId('timer');
-    expect(timer).toHaveClass('custom-timer');
+    const timerContainer = container.firstChild;
+    expect(timerContainer).toHaveClass('custom-timer');
+    expect(timerContainer).toHaveClass('text-center');
   });
 
-  test('アクセシビリティ属性が正しく設定されること', () => {
-    render(<Timer initialTime={30} />);
+  test('プログレスバーが負の値にならないこと', () => {
+    const { container } = render(<Timer timeRemaining={-5} totalTime={30} />);
     
-    const timer = screen.getByTestId('timer');
-    expect(timer).toHaveAttribute('role', 'timer');
-    expect(timer).toHaveAttribute('aria-label', '残り時間');
+    const progressBar = container.querySelector('.h-2.rounded-full.transition-all');
+    expect(progressBar).toHaveStyle('width: 0%');
+  });
+
+  test('totalTime が 0 の場合にエラーが発生しないこと', () => {
+    expect(() => {
+      render(<Timer timeRemaining={0} totalTime={0} />);
+    }).not.toThrow();
+    
+    // プログレスバーは0%になるはず
+    const { container } = render(<Timer timeRemaining={0} totalTime={0} />);
+    const progressBar = container.querySelector('.h-2.rounded-full.transition-all');
+    expect(progressBar).toHaveStyle('width: 0%');
   });
 });

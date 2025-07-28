@@ -18,7 +18,8 @@ func TestGeminiClient(t *testing.T) {
 	}
 
 	t.Run("Gemini APIが正常に動作すること", func(t *testing.T) {
-		client := NewGeminiClient(apiKey)
+		client, err := NewGeminiClient(apiKey)
+		assert.NoError(t, err)
 		ctx := context.Background()
 		
 		question, err := client.GenerateQuestion(ctx, domain.DifficultyMedium, "general")
@@ -35,7 +36,8 @@ func TestGeminiClient(t *testing.T) {
 	})
 
 	t.Run("簡単な問題生成が正常に動作すること", func(t *testing.T) {
-		client := NewGeminiClient(apiKey)
+		client, err := NewGeminiClient(apiKey)
+		assert.NoError(t, err)
 		ctx := context.Background()
 		
 		question, err := client.GenerateQuestion(ctx, domain.DifficultyEasy, "science")
@@ -48,7 +50,8 @@ func TestGeminiClient(t *testing.T) {
 	})
 
 	t.Run("難しい問題生成が正常に動作すること", func(t *testing.T) {
-		client := NewGeminiClient(apiKey)
+		client, err := NewGeminiClient(apiKey)
+		assert.NoError(t, err)
 		ctx := context.Background()
 		
 		question, err := client.GenerateQuestion(ctx, domain.DifficultyHard, "history")
@@ -61,7 +64,12 @@ func TestGeminiClient(t *testing.T) {
 	})
 
 	t.Run("無効なAPIキーでエラーが返ること", func(t *testing.T) {
-		client := NewGeminiClient("invalid-api-key")
+		client, clientErr := NewGeminiClient("invalid-api-key")
+		if clientErr != nil {
+			// クライアント作成時点でエラーが発生する場合
+			assert.Error(t, clientErr)
+			return
+		}
 		ctx := context.Background()
 		
 		question, err := client.GenerateQuestion(ctx, domain.DifficultyMedium, "general")

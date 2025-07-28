@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom';
+// import { server } from './mocks/server';
 
 // グローバルなテスト設定
 
@@ -96,6 +97,19 @@ afterEach(() => {
 process.on('unhandledRejection', (error) => {
   console.error('Unhandled promise rejection:', error);
 });
+
+// MSWサーバーのセットアップ（一時的にコメントアウト）
+// beforeAll(() => {
+//   server.listen({ onUnhandledRequest: 'error' });
+// });
+
+// afterEach(() => {
+//   server.resetHandlers();
+// });
+
+// afterAll(() => {
+//   server.close();
+// });
 
 // テスト環境の確認（Jestが自動的にtest環境を設定しない場合があるため、より緩やかなチェック）
 if (process.env.NODE_ENV && process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'development') {

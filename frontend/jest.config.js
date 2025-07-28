@@ -31,7 +31,7 @@ const customJestConfig = {
     '<rootDir>/node_modules/',
   ],
   transformIgnorePatterns: [
-    '/node_modules/(?!(.*\\.esm\\.js$))',
+    '/node_modules/(?!(msw|@mswjs))',
   ],
   testMatch: [
     '<rootDir>/src/**/__tests__/**/*.{js,jsx,ts,tsx}',

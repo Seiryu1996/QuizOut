@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,7 +19,22 @@ import (
 // 同時実行テスト用のモック
 type MockConcurrentRepository struct {
 	mock.Mock
-	mu sync.RWMutex
+	mu                  sync.RWMutex
+	participantCount    map[string]int // sessionID -> count
+	maxParticipants     map[string]int // sessionID -> max capacity
+}
+
+func NewMockConcurrentRepository() *MockConcurrentRepository {
+	return &MockConcurrentRepository{
+		participantCount: make(map[string]int),
+		maxParticipants:  make(map[string]int),
+	}
+}
+
+func (m *MockConcurrentRepository) SetMaxParticipants(sessionID string, max int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.maxParticipants[sessionID] = max
 }
 
 func (m *MockConcurrentRepository) SubmitAnswer(ctx context.Context, answer *domain.Answer) error {
@@ -45,6 +61,19 @@ func (m *MockConcurrentRepository) EliminateParticipant(ctx context.Context, use
 func (m *MockConcurrentRepository) JoinSession(ctx context.Context, participant *domain.Participant) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	
+	sessionID := participant.SessionID
+	currentCount := m.participantCount[sessionID]
+	maxCount := m.maxParticipants[sessionID]
+	
+	// Check capacity limit
+	if maxCount > 0 && currentCount >= maxCount {
+		return errors.New("session is full")
+	}
+	
+	// Increment participant count
+	m.participantCount[sessionID] = currentCount + 1
+	
 	args := m.Called(ctx, participant)
 	return args.Error(0)
 }
@@ -52,13 +81,15 @@ func (m *MockConcurrentRepository) JoinSession(ctx context.Context, participant 
 func (m *MockConcurrentRepository) GetParticipantCount(ctx context.Context, sessionID string) (int, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	
+	count := m.participantCount[sessionID]
 	args := m.Called(ctx, sessionID)
-	return args.Int(0), args.Error(1)
+	return count, args.Error(1)
 }
 
 func TestConcurrentOperations(t *testing.T) {
 	t.Run("同時回答送信での整合性確保", func(t *testing.T) {
-		mockRepo := &MockConcurrentRepository{}
+		mockRepo := NewMockConcurrentRepository()
 		ctx := context.Background()
 		
 		// 100人が同時に回答送信のシミュレーション
@@ -139,40 +170,24 @@ func TestConcurrentOperations(t *testing.T) {
 	})
 
 	t.Run("同時参加での整合性確保", func(t *testing.T) {
-		mockRepo := &MockConcurrentRepository{}
+		mockRepo := NewMockConcurrentRepository()
 		ctx := context.Background()
 		
 		sessionID := "session456"
 		maxParticipants := 10
 		attemptingParticipants := 20 // 定員の2倍が参加を試行
 		
+		// 定員設定
+		mockRepo.SetMaxParticipants(sessionID, maxParticipants)
+		
 		var wg sync.WaitGroup
 		var joinErrors []error
 		var errorMutex sync.Mutex
 		var successCount int32
-		var successMutex sync.Mutex
 		
-		// 参加者数カウンターをシミュレート
-		currentCount := 0
-		
-		// モックの設定：定員管理のシミュレーション
-		mockRepo.On("GetParticipantCount", mock.Anything, sessionID).Return(func(ctx context.Context, sessionID string) int {
-			successMutex.Lock()
-			defer successMutex.Unlock()
-			return int(successCount)
-		}, nil)
-		
-		mockRepo.On("JoinSession", mock.Anything, mock.AnythingOfType("*domain.Participant")).Return(func(ctx context.Context, participant *domain.Participant) error {
-			successMutex.Lock()
-			defer successMutex.Unlock()
-			
-			if successCount >= int32(maxParticipants) {
-				return errors.New("session is full")
-			}
-			
-			successCount++
-			return nil
-		})
+		// モックの設定：参加処理を許可
+		mockRepo.On("GetParticipantCount", mock.Anything, sessionID).Return(0, nil).Maybe()
+		mockRepo.On("JoinSession", mock.Anything, mock.AnythingOfType("*domain.Participant")).Return(nil)
 		
 		// 20人が同時に参加を試行
 		for i := 0; i < attemptingParticipants; i++ {
@@ -184,29 +199,15 @@ func TestConcurrentOperations(t *testing.T) {
 				displayName := fmt.Sprintf("User %d", userIndex)
 				participant := domain.NewParticipant(userID, sessionID, displayName)
 				
-				// 参加者数確認
-				currentCount, err := mockRepo.GetParticipantCount(ctx, sessionID)
+				// 参加処理（容量チェックはJoinSession内で実行される）
+				err := mockRepo.JoinSession(ctx, participant)
 				if err != nil {
 					errorMutex.Lock()
 					joinErrors = append(joinErrors, err)
 					errorMutex.Unlock()
-					return
-				}
-				
-				// 定員チェック
-				if currentCount >= maxParticipants {
-					errorMutex.Lock()
-					joinErrors = append(joinErrors, errors.New("session is full"))
-					errorMutex.Unlock()
-					return
-				}
-				
-				// 参加処理
-				err = mockRepo.JoinSession(ctx, participant)
-				if err != nil {
-					errorMutex.Lock()
-					joinErrors = append(joinErrors, err)
-					errorMutex.Unlock()
+				} else {
+					// 成功カウント
+					atomic.AddInt32(&successCount, 1)
 				}
 			}(i)
 		}
@@ -215,7 +216,6 @@ func TestConcurrentOperations(t *testing.T) {
 		
 		// アサーション
 		errorMutex.Lock()
-		finalSuccessCount := successCount
 		fullErrors := 0
 		for _, err := range joinErrors {
 			if strings.Contains(err.Error(), "session is full") {
@@ -223,6 +223,8 @@ func TestConcurrentOperations(t *testing.T) {
 			}
 		}
 		errorMutex.Unlock()
+		
+		finalSuccessCount := atomic.LoadInt32(&successCount)
 		
 		// 定員ぴったりで参加が制限されることを確認
 		assert.Equal(t, int32(maxParticipants), finalSuccessCount, "参加者数が定員と一致しない")
@@ -233,7 +235,7 @@ func TestConcurrentOperations(t *testing.T) {
 	})
 
 	t.Run("管理者操作との同時実行", func(t *testing.T) {
-		mockRepo := &MockConcurrentRepository{}
+		mockRepo := NewMockConcurrentRepository()
 		ctx := context.Background()
 		
 		var wg sync.WaitGroup
@@ -293,7 +295,7 @@ func TestConcurrentOperations(t *testing.T) {
 		// シナリオ2: 問題配信中にセッション操作
 		t.Run("問題配信中にセッション操作", func(t *testing.T) {
 			var configErrors []error
-			var configMutex sync.Mutex
+			configMutex := &sync.Mutex{}
 			
 			// 問題配信プロセス
 			wg.Add(1)
@@ -315,6 +317,8 @@ func TestConcurrentOperations(t *testing.T) {
 				
 				// セッション設定変更のシミュレーション
 				// 実際の実装では適切な排他制御が必要
+				configMutex.Lock()
+				defer configMutex.Unlock()
 				t.Log("セッション設定を変更中")
 			}()
 			

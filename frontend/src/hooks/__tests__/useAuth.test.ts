@@ -13,10 +13,14 @@ jest.mock('@/lib/firebase', () => ({
 }));
 
 // Firebase auth functions をモック化
+const mockOnAuthStateChanged = jest.fn();
+const mockSignInAnonymously = jest.fn();
+const mockSignOut = jest.fn();
+
 jest.mock('firebase/auth', () => ({
-  signInAnonymously: jest.fn(),
-  onAuthStateChanged: jest.fn(),
-  signOut: jest.fn(),
+  signInAnonymously: mockSignInAnonymously,
+  onAuthStateChanged: mockOnAuthStateChanged,
+  signOut: mockSignOut,
 }));
 
 // Zustore をモック化
@@ -48,7 +52,21 @@ describe('useAuth Hook', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseUserStore.mockReturnValue(mockUserStore);
+    // デフォルトのモック設定
+    mockUseUserStore.mockImplementation((selector?: any) => {
+      if (selector) {
+        return selector(mockUserStore);
+      }
+      return mockUserStore;
+    });
+    
+    // onAuthStateChangedのモック設定
+    mockOnAuthStateChanged.mockImplementation((auth, callback) => {
+      // 即座にnullユーザーでコールバック実行
+      setTimeout(() => callback(null), 0);
+      // unsubscribe関数を返す
+      return jest.fn();
+    });
   });
 
   test('初期状態が正しいこと', () => {

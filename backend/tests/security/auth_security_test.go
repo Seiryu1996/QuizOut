@@ -5,27 +5,38 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	
+	"quiz-app/internal/middleware"
 )
 
 func setupTestRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
 	
+	// WebSocket endpoint with rate limiting
+	router.GET("/ws", middleware.WebSocketRateLimit(), mockWebSocketHandler)
+	
 	// 実際のルートハンドラーを設定（モック使用）
 	api := router.Group("/api/v1")
 	{
 		auth := api.Group("/auth")
+		auth.Use(middleware.LoginRateLimit()) // ログイン専用レート制限
 		{
 			auth.POST("/verify-access-code", mockVerifyAccessCodeHandler)
 			auth.POST("/login", mockLoginHandler)
 			auth.POST("/bulk-users", mockBulkUsersHandler)
 		}
+		
+		// API rate limiting for general endpoints
+		api.Use(middleware.APIRateLimit())
+		api.GET("/games", mockGamesHandler) // Add missing games endpoint
 		
 		games := api.Group("/games")
 		{
@@ -113,7 +124,8 @@ func TestAuthSecurity(t *testing.T) {
 
 			for _, param := range maliciousParams {
 				w := httptest.NewRecorder()
-				req := httptest.NewRequest("GET", "/api/v1/games?search="+param, nil)
+				encodedParam := url.QueryEscape(param)
+				req := httptest.NewRequest("GET", "/api/v1/games?search="+encodedParam, nil)
 
 				router.ServeHTTP(w, req)
 
@@ -435,4 +447,12 @@ func mockSubmitAnswerHandler(c *gin.Context) {
 	}
 	
 	c.JSON(http.StatusOK, gin.H{"result": "submitted"})
+}
+
+func mockGamesHandler(c *gin.Context) {
+	c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+}
+
+func mockWebSocketHandler(c *gin.Context) {
+	c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
 }

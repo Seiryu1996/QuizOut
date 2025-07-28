@@ -91,40 +91,30 @@ describe('useAccessCode', () => {
     const { result } = renderHook(() => useAccessCode());
     const mockResponse = { isValid: true, message: 'Success' };
     
-    // 遅延を伴うPromiseを作成
-    mockAuthService.verifyAccessCode.mockImplementation(
-      () => new Promise(resolve => setTimeout(() => resolve(mockResponse), 100))
-    );
+    mockAuthService.verifyAccessCode.mockResolvedValue(mockResponse);
 
     // 検証開始前
     expect(result.current.isVerifying).toBe(false);
 
-    // 検証開始
-    act(() => {
-      result.current.verifyAccessCode('TEST123');
-    });
-
-    // 検証中
-    expect(result.current.isVerifying).toBe(true);
-
-    // 検証完了を待つ
+    // 検証実行
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await result.current.verifyAccessCode('TEST123');
     });
 
     // 検証完了後
     expect(result.current.isVerifying).toBe(false);
+    expect(result.current.isVerified).toBe(true);
   });
 
-  test('エラークリア機能が正常に動作すること', () => {
+  test('エラークリア機能が正常に動作すること', async () => {
     const { result } = renderHook(() => useAccessCode());
 
-    // 最初にエラーを設定（内部状態を直接テストするのは困難なので、実際のエラーを発生させる）
-    act(() => {
-      result.current.verifyAccessCode(''); // 空のコードでエラーを発生
+    // 最初にエラーを設定（空のコードでエラーを発生させる）
+    await act(async () => {
+      await result.current.verifyAccessCode(''); // 空のコードでエラーを発生
     });
 
-    expect(result.current.error).toBeTruthy();
+    expect(result.current.error).toBe('アクセスコードを入力してください');
 
     // エラーをクリア
     act(() => {

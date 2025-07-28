@@ -2,6 +2,15 @@ import { render, screen } from '@testing-library/react';
 import { ParticipantsList } from '../ParticipantsList';
 import { Participant } from '@/types/quiz';
 
+// StatusBadgeコンポーネントのモック
+jest.mock('@/components/atoms/StatusBadge', () => ({
+  StatusBadge: ({ status }: { status: string }) => (
+    <span data-testid={`status-badge-${status}`} className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-${status === 'active' ? 'success' : status === 'eliminated' ? 'danger' : 'primary'}-100 text-${status === 'active' ? 'success' : status === 'eliminated' ? 'danger' : 'primary'}-800`}>
+      {status === 'active' ? 'アクティブ' : status === 'eliminated' ? '脱落' : '復活'}
+    </span>
+  )
+}));
+
 describe('ParticipantsList Component', () => {
   const mockParticipants: Participant[] = [
     {
@@ -20,8 +29,7 @@ describe('ParticipantsList Component', () => {
       status: 'eliminated',
       score: 60,
       correctAnswers: 3,
-      joinedAt: '2024-01-01T00:00:00Z',
-      eliminatedAt: '2024-01-01T01:00:00Z'
+      joinedAt: '2024-01-01T00:00:00Z'
     },
     {
       id: '3',
@@ -30,14 +38,16 @@ describe('ParticipantsList Component', () => {
       status: 'revived',
       score: 40,
       correctAnswers: 2,
-      joinedAt: '2024-01-01T00:00:00Z',
-      eliminatedAt: '2024-01-01T01:00:00Z',
-      revivedAt: '2024-01-01T02:00:00Z'
+      joinedAt: '2024-01-01T00:00:00Z'
     }
   ];
 
   test('参加者一覧が正常に表示されること', () => {
     render(<ParticipantsList participants={mockParticipants} />);
+    
+    // タイトルの確認
+    expect(screen.getByText('参加者一覧')).toBeInTheDocument();
+    expect(screen.getByText('3人参加中')).toBeInTheDocument();
     
     // 全参加者が表示されること
     expect(screen.getByText('参加者1')).toBeInTheDocument();
@@ -53,157 +63,146 @@ describe('ParticipantsList Component', () => {
     });
   });
 
-  test('ステータスに応じたアイコンが表示されること', () => {
+  test('ステータスバッジが表示されること', () => {
     render(<ParticipantsList participants={mockParticipants} />);
     
-    // アクティブ参加者のアイコン
-    const activeIcon = screen.getByTestId('status-active-1');
-    expect(activeIcon).toBeInTheDocument();
-    expect(activeIcon).toHaveClass('text-green-500');
-    
-    // 脱落者のアイコン
-    const eliminatedIcon = screen.getByTestId('status-eliminated-2');
-    expect(eliminatedIcon).toBeInTheDocument();
-    expect(eliminatedIcon).toHaveClass('text-red-500');
-    
-    // 復活者のアイコン
-    const revivedIcon = screen.getByTestId('status-revived-3');
-    expect(revivedIcon).toBeInTheDocument();
-    expect(revivedIcon).toHaveClass('text-blue-500');
-  });
-
-  test('参加者数が正しく表示されること', () => {
-    render(<ParticipantsList participants={mockParticipants} showStats={true} />);
-    
-    // 総参加者数
-    expect(screen.getByText('総参加者: 3人')).toBeInTheDocument();
-    
-    // アクティブ参加者数
-    expect(screen.getByText('アクティブ: 1人')).toBeInTheDocument();
-    
-    // 脱落者数  
-    expect(screen.getByText('脱落: 1人')).toBeInTheDocument();
-    
-    // 復活者数
-    expect(screen.getByText('復活: 1人')).toBeInTheDocument();
+    // ステータスバッジの確認
+    expect(screen.getByTestId('status-badge-active')).toBeInTheDocument();
+    expect(screen.getByTestId('status-badge-eliminated')).toBeInTheDocument();
+    expect(screen.getByTestId('status-badge-revived')).toBeInTheDocument();
   });
 
   test('スコア情報が表示されること', () => {
-    render(<ParticipantsList participants={mockParticipants} showScore={true} />);
+    render(<ParticipantsList participants={mockParticipants} />);
     
-    expect(screen.getByText('100pt')).toBeInTheDocument();
-    expect(screen.getByText('60pt')).toBeInTheDocument();
-    expect(screen.getByText('40pt')).toBeInTheDocument();
-  });
-
-  test('正解数が表示されること', () => {
-    render(<ParticipantsList participants={mockParticipants} showCorrectAnswers={true} />);
-    
-    expect(screen.getByText('5問正解')).toBeInTheDocument();
-    expect(screen.getByText('3問正解')).toBeInTheDocument();
-    expect(screen.getByText('2問正解')).toBeInTheDocument();
+    expect(screen.getByText('100pt (5問正解)')).toBeInTheDocument();
+    expect(screen.getByText('60pt (3問正解)')).toBeInTheDocument();
+    expect(screen.getByText('40pt (2問正解)')).toBeInTheDocument();
   });
 
   test('空の参加者リストが適切に処理されること', () => {
-    render(<ParticipantsList participants={[]} showStats={true} />);
+    render(<ParticipantsList participants={[]} />);
     
-    expect(screen.getByText('参加者はいません')).toBeInTheDocument();
-    expect(screen.getByText('総参加者: 0人')).toBeInTheDocument();
-    expect(screen.getByText('アクティブ: 0人')).toBeInTheDocument();
+    expect(screen.getByText('参加者がいません')).toBeInTheDocument();
+    expect(screen.getByText('0人参加中')).toBeInTheDocument();
   });
 
-  test('参加者の並び順が正しいこと', () => {
-    // スコア降順でソート
-    render(<ParticipantsList participants={mockParticipants} sortBy="score" />);
-    
-    const participantNames = screen.getAllByTestId(/participant-name/);
-    expect(participantNames[0]).toHaveTextContent('参加者1'); // 100pt
-    expect(participantNames[1]).toHaveTextContent('参加者2'); // 60pt
-    expect(participantNames[2]).toHaveTextContent('参加者3'); // 40pt
-  });
+  test('参加者の並び順が正しいこと（ステータス＞スコア順）', () => {
+    // 意図的に順序を変えた参加者リスト
+    const unorderedParticipants: Participant[] = [
+      {
+        id: '2',
+        userId: 'user2',
+        displayName: '参加者2',
+        status: 'eliminated',
+        score: 60,
+        correctAnswers: 3,
+        joinedAt: '2024-01-01T00:00:00Z'
+      },
+      {
+        id: '1',
+        userId: 'user1',
+        displayName: '参加者1',
+        status: 'active',
+        score: 100,
+        correctAnswers: 5,
+        joinedAt: '2024-01-01T00:00:00Z'
+      },
+      {
+        id: '3',
+        userId: 'user3',
+        displayName: '参加者3',
+        status: 'revived',
+        score: 40,
+        correctAnswers: 2,
+        joinedAt: '2024-01-01T00:00:00Z'
+      }
+    ];
 
-  test('フィルタリング機能が正常に動作すること', () => {
-    // アクティブ参加者のみ表示
-    render(<ParticipantsList participants={mockParticipants} filterBy="active" />);
+    const { container } = render(<ParticipantsList participants={unorderedParticipants} />);
     
-    expect(screen.getByText('参加者1')).toBeInTheDocument();
-    expect(screen.queryByText('参加者2')).not.toBeInTheDocument();
-    expect(screen.queryByText('参加者3')).not.toBeInTheDocument();
+    // 参加者要素を取得（表示順序で）
+    const participantElements = container.querySelectorAll('.space-y-2 > div');
+    
+    // 最初の要素（active）に参加者1が含まれること
+    expect(participantElements[0]).toHaveTextContent('参加者1');
+    expect(participantElements[0]).toHaveTextContent('アクティブ');
+    
+    // 2番目の要素（revived）に参加者3が含まれること
+    expect(participantElements[1]).toHaveTextContent('参加者3');
+    expect(participantElements[1]).toHaveTextContent('復活');
+    
+    // 3番目の要素（eliminated）に参加者2が含まれること
+    expect(participantElements[2]).toHaveTextContent('参加者2');
+    expect(participantElements[2]).toHaveTextContent('脱落');
   });
 
   test('現在のユーザーがハイライトされること', () => {
-    render(<ParticipantsList participants={mockParticipants} currentUserId="user1" />);
+    const { container } = render(<ParticipantsList participants={mockParticipants} currentUserId="user1" />);
     
-    const currentUserElement = screen.getByTestId('participant-1');
-    expect(currentUserElement).toHaveClass('bg-blue-50', 'border-blue-200');
+    // 現在のユーザーの要素を取得
+    const currentUserElement = container.querySelector('.border-primary-200.bg-primary-50');
+    expect(currentUserElement).toBeInTheDocument();
+    expect(currentUserElement).toHaveTextContent('参加者1');
+    expect(currentUserElement).toHaveTextContent('(あなた)');
   });
 
-  test('ランキング表示が正常に動作すること', () => {
-    render(<ParticipantsList participants={mockParticipants} showRanking={true} />);
+  test('現在のユーザーのアバターが特別な色になること', () => {
+    const { container } = render(<ParticipantsList participants={mockParticipants} currentUserId="user1" />);
     
-    expect(screen.getByText('1位')).toBeInTheDocument();
-    expect(screen.getByText('2位')).toBeInTheDocument();
-    expect(screen.getByText('3位')).toBeInTheDocument();
+    // 現在のユーザーのアバターを取得
+    const currentUserAvatar = container.querySelector('.bg-primary-500.text-white');
+    expect(currentUserAvatar).toBeInTheDocument();
+    expect(currentUserAvatar).toHaveTextContent('参');
   });
 
-  test('リアルタイム更新インジケーターが表示されること', () => {
-    render(<ParticipantsList participants={mockParticipants} isUpdating={true} />);
+  test('maxDisplayで表示数が制限されること', () => {
+    render(<ParticipantsList participants={mockParticipants} maxDisplay={2} />);
     
-    const updateIndicator = screen.getByTestId('update-indicator');
-    expect(updateIndicator).toBeInTheDocument();
-    expect(updateIndicator).toHaveClass('animate-pulse');
+    // 最初の2人だけ表示される
+    expect(screen.getByText('参加者1')).toBeInTheDocument();
+    expect(screen.getByText('参加者3')).toBeInTheDocument(); // revivedなので2番目
+    
+    // 残りの人数が表示される
+    expect(screen.getByText('他 1人')).toBeInTheDocument();
   });
 
-  test('アクセシビリティ属性が正しく設定されること', () => {
-    render(<ParticipantsList participants={mockParticipants} />);
-    
-    // リスト要素にrole属性
-    const participantList = screen.getByRole('list');
-    expect(participantList).toBeInTheDocument();
-    expect(participantList).toHaveAttribute('aria-label', '参加者一覧');
-    
-    // 各参加者要素にlistitem role
-    const listItems = screen.getAllByRole('listitem');
-    expect(listItems).toHaveLength(3);
-  });
+  test('スコアが0の参加者はスコア情報が表示されないこと', () => {
+    const participantsWithZeroScore: Participant[] = [
+      {
+        id: '1',
+        userId: 'user1',
+        displayName: '参加者1',
+        status: 'active',
+        score: 0,
+        correctAnswers: 0,
+        joinedAt: '2024-01-01T00:00:00Z'
+      }
+    ];
 
-  test('大量の参加者でも適切に表示されること', () => {
-    const manyParticipants = Array.from({ length: 200 }, (_, i) => ({
-      id: `${i + 1}`,
-      userId: `user${i + 1}`,
-      displayName: `参加者${i + 1}`,
-      status: 'active' as const,
-      score: Math.floor(Math.random() * 100),
-      correctAnswers: Math.floor(Math.random() * 10),
-      joinedAt: '2024-01-01T00:00:00Z'
-    }));
-
-    render(<ParticipantsList participants={manyParticipants} />);
-    
-    // 仮想化が適用されていることを確認（実装に依存）
-    const participantList = screen.getByTestId('participants-list');
-    expect(participantList).toBeInTheDocument();
-  });
-
-  test('検索機能が正常に動作すること', () => {
-    render(<ParticipantsList participants={mockParticipants} searchQuery="参加者1" />);
+    render(<ParticipantsList participants={participantsWithZeroScore} />);
     
     expect(screen.getByText('参加者1')).toBeInTheDocument();
-    expect(screen.queryByText('参加者2')).not.toBeInTheDocument();
-    expect(screen.queryByText('参加者3')).not.toBeInTheDocument();
+    expect(screen.queryByText('0pt (0問正解)')).not.toBeInTheDocument();
   });
 
-  test('ステータス変更アニメーションが表示されること', () => {
-    const { rerender } = render(<ParticipantsList participants={mockParticipants} />);
-    
-    // ステータス変更
-    const updatedParticipants = mockParticipants.map(p => 
-      p.id === '1' ? { ...p, status: 'eliminated' as const } : p
+  test('カスタムクラス名が適用されること', () => {
+    const { container } = render(
+      <ParticipantsList participants={mockParticipants} className="custom-class" />
     );
     
-    rerender(<ParticipantsList participants={updatedParticipants} animateChanges={true} />);
+    const listContainer = container.firstChild;
+    expect(listContainer).toHaveClass('card');
+    expect(listContainer).toHaveClass('custom-class');
+  });
+
+  test('参加者名の最初の文字がアバターに表示されること', () => {
+    const { container } = render(<ParticipantsList participants={mockParticipants} />);
     
-    const changedParticipant = screen.getByTestId('participant-1');
-    expect(changedParticipant).toHaveClass('animate-bounce');
+    // 各参加者のアバターを確認
+    const avatars = container.querySelectorAll('.w-8.h-8.rounded-full');
+    expect(avatars[0]).toHaveTextContent('参'); // 参加者1の「参」
+    expect(avatars[1]).toHaveTextContent('参'); // 参加者3の「参」
+    expect(avatars[2]).toHaveTextContent('参'); // 参加者2の「参」
   });
 });
