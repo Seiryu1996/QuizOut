@@ -2,50 +2,92 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { useAPI } from '@/hooks/useAPI';
 import { authService } from '@/services/authService';
-import { User } from '@/types/auth';
+import { Game } from '@/types/quiz';
 
 export default function QuizSelectionPage() {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [sessionId, setSessionId] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, isAuthenticated, isAdmin, loading: authLoading } = useAdminAuth();
+  const api = useAPI();
+  const [availableGames, setAvailableGames] = useState<Game[]>([]);
   const [isJoining, setIsJoining] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [loadingGames, setLoadingGames] = useState(false);
+  const [gamesError, setGamesError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadUserInfo();
-  }, []);
+    if (!authLoading) {
+      if (!isAuthenticated) {
+        router.push('/access-code');
+        return;
+      }
+      loadAvailableGames();
+    }
+  }, [authLoading, isAuthenticated, router]);
 
-  const loadUserInfo = async () => {
+
+  const loadAvailableGames = async () => {
     try {
-      const response = await authService.getMe();
-      setUser(response.user);
-      setIsAdmin(response.user.isAdmin || false);
+      setLoadingGames(true);
+      setGamesError(null);
+      const response = await api.listAvailableGames();
+      if (response.success && response.data) {
+        setAvailableGames(response.data);
+      } else {
+        setGamesError('ゲーム一覧の取得に失敗しました');
+      }
     } catch (error) {
-      console.error('Failed to load user info:', error);
-      // 認証エラーの場合はアクセスコードページにリダイレクト
-      router.push('/access-code');
+      console.error('Failed to load available games:', error);
+      setGamesError('ゲーム一覧の取得に失敗しました');
     } finally {
-      setIsLoading(false);
+      setLoadingGames(false);
     }
   };
 
-  const handleJoinQuiz = async () => {
-    if (!sessionId.trim()) {
-      alert('セッションIDを入力してください');
+  const handleJoinGame = async (gameId: string) => {
+    if (!isAuthenticated || !user) {
+      alert('ログインが必要です');
+      router.push('/access-code');
       return;
     }
 
     setIsJoining(true);
     try {
-      // クイズページに遷移
-      router.push(`/quiz/${sessionId}`);
+      // ゲームに参加
+      const response = await api.joinSession(gameId, {
+        displayName: user.displayName
+      });
+
+      if (response.success) {
+        // 参加成功後、ゲームページに遷移
+        router.push(`/quiz/${gameId}`);
+      } else {
+        alert('ゲームへの参加に失敗しました: ' + (response.error?.message || '不明なエラー'));
+      }
     } catch (error) {
-      console.error('Join quiz error:', error);
-      alert('クイズへの参加に失敗しました');
+      console.error('Join game error:', error);
+      alert('ゲームへの参加に失敗しました');
     } finally {
       setIsJoining(false);
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'waiting': return '開始待ち';
+      case 'active': return '進行中';
+      case 'finished': return '終了';
+      default: return status;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'waiting': return 'bg-yellow-100 text-yellow-800';
+      case 'active': return 'bg-green-100 text-green-800';
+      case 'finished': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -62,7 +104,8 @@ export default function QuizSelectionPage() {
     }
   };
 
-  if (isLoading) {
+  // 認証チェック
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
@@ -71,6 +114,11 @@ export default function QuizSelectionPage() {
         </div>
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    router.push('/access-code');
+    return null;
   }
 
   return (
@@ -110,64 +158,131 @@ export default function QuizSelectionPage() {
           )}
         </div>
 
-        {/* クイズ参加カード */}
+        {/* 参加可能ゲーム一覧 */}
         <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4 text-center">
-            クイズに参加
-          </h2>
-
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="sessionId" className="block text-sm font-medium text-gray-700 mb-2">
-                セッションID
-              </label>
-              <input
-                id="sessionId"
-                type="text"
-                value={sessionId}
-                onChange={(e) => setSessionId(e.target.value)}
-                placeholder="セッションIDを入力"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                disabled={isJoining}
-                autoComplete="off"
-              />
-            </div>
-
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">
+              参加可能なゲーム
+            </h2>
             <button
-              onClick={handleJoinQuiz}
-              disabled={!sessionId.trim() || isJoining}
-              className={
-                `w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg text-white font-medium transition-all duration-200 ${
-                  !sessionId.trim() || isJoining
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-500 focus:ring-opacity-50 transform hover:scale-105'
-                }`
-              }
+              onClick={loadAvailableGames}
+              disabled={loadingGames}
+              className="text-sm text-blue-600 hover:text-blue-800 underline"
             >
-              {isJoining ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  参加中...
-                </>
-              ) : (
-                'クイズに参加'
-              )}
+              更新
             </button>
           </div>
+
+          {loadingGames ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">ゲームを読み込み中...</p>
+            </div>
+          ) : gamesError ? (
+            <div className="text-center py-8">
+              <div className="text-4xl mb-4">😞</div>
+              <p className="text-gray-600 mb-4">{gamesError}</p>
+              <button
+                onClick={loadAvailableGames}
+                className="text-blue-600 hover:text-blue-800 underline"
+              >
+                再試行
+              </button>
+            </div>
+          ) : availableGames.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-4xl mb-4">🎮</div>
+              <p className="text-gray-600">現在参加可能なゲームはありません</p>
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {availableGames.map((game) => (
+                <div
+                  key={game.id}
+                  className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <h3 className="font-semibold text-gray-900">{game.title}</h3>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(game.status)}`}>
+                          {getStatusText(game.status)}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-4 text-sm text-gray-600">
+                        <span>参加者: {game.participantCount || 0}/{game.maxParticipants}人</span>
+                        {game.status === 'active' && (
+                          <span>ラウンド: {game.currentRound}</span>
+                        )}
+                        <span>制限時間: {game.settings.timeLimit}秒</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleJoinGame(game.id)}
+                      disabled={isJoining || (game.participantCount || 0) >= game.maxParticipants}
+                      className={
+                        `px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                          isJoining || (game.participantCount || 0) >= game.maxParticipants
+                            ? 'bg-gray-400 text-white cursor-not-allowed'
+                            : 'bg-blue-600 text-white hover:bg-blue-700 transform hover:scale-105'
+                        }`
+                      }
+                    >
+                      {isJoining ? '参加中...' : '参加'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* 管理者用リンク - 管理者のみ表示 */}
+        {/* 管理者専用機能 - 管理者のみ表示 */}
         {isAdmin && (
-          <div className="text-center mb-6">
-            <button
-              onClick={handleGoToAdmin}
-              className="text-blue-600 hover:text-blue-800 underline font-medium"
-            >
-              管理者ダッシュボード
-            </button>
+          <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              管理者機能
+            </h2>
+            <div className="flex flex-col space-y-3">
+              <button
+                onClick={handleGoToAdmin}
+                className="w-full bg-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-purple-700 transition-colors"
+              >
+                新しいゲームを作成
+              </button>
+              
+              {availableGames.length > 0 && (
+                <div className="border-t pt-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">作成済みゲーム管理</h3>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {availableGames.map((game) => (
+                      <div
+                        key={game.id}
+                        className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium text-sm">{game.title}</span>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(game.status)}`}>
+                              {getStatusText(game.status)}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            参加者: {game.participantCount || 0}人
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => router.push(`/admin/session/${game.id}`)}
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium underline"
+                        >
+                          管理
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

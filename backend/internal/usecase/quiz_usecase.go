@@ -48,14 +48,18 @@ func (u *quizUseCase) GenerateQuestion(ctx context.Context, sessionID string, ro
 		return nil, domain.ErrSessionNotFound
 	}
 
-	if !session.IsActive() {
+	if session.IsFinished() {
 		return nil, domain.ErrSessionNotActive
 	}
 
-	// 既にそのラウンドの問題が存在するかチェック
-	existingQuestion, err := u.questionRepo.GetBySessionAndRound(ctx, sessionID, round)
-	if err == nil && existingQuestion != nil {
-		return existingQuestion, nil
+	// 管理者が問題生成する場合は、現在のラウンドを自動的に進める
+	if round == session.CurrentRound {
+		// 既存の問題があるかチェック
+		existingQuestion, err := u.questionRepo.GetBySessionAndRound(ctx, sessionID, round)
+		if err == nil && existingQuestion != nil {
+			// 既存の問題がある場合は次のラウンドの問題を生成
+			round = session.CurrentRound + 1
+		}
 	}
 
 	// 難易度をラウンドに応じて自動調整
@@ -105,6 +109,24 @@ func (u *quizUseCase) GetCurrentQuestion(ctx context.Context, sessionID string) 
 	}
 
 	return question, nil
+}
+
+func (u *quizUseCase) GetAllQuestions(ctx context.Context, sessionID string) ([]*domain.Question, error) {
+	if sessionID == "" {
+		return nil, domain.ErrInvalidInput
+	}
+
+	session, err := u.sessionRepo.GetByID(ctx, sessionID)
+	if err != nil {
+		return nil, domain.ErrSessionNotFound
+	}
+
+	questions, err := u.questionRepo.GetBySession(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get questions: %w", err)
+	}
+
+	return questions, nil
 }
 
 func (u *quizUseCase) SubmitAnswer(ctx context.Context, sessionID, userID, questionID string, selectedOption, responseTime int) (*domain.Answer, error) {

@@ -155,11 +155,16 @@ func main() {
 	{
 		// アクセスコード認証エンドポイント
 		auth := v1.Group("/auth")
-		auth.Use(middleware.LoginRateLimit()) // ログイン専用レート制限
 		{
-			auth.POST("/verify-access-code", authHandler.VerifyAccessCode)
-			auth.POST("/login", authHandler.Login)
-			auth.GET("/me", authHandler.GetMe)
+			// アクセスコード検証は専用のレート制限
+			auth.POST("/verify-access-code", middleware.AccessCodeRateLimit(), authHandler.VerifyAccessCode)
+			// その他の認証エンドポイントはログイン専用レート制限
+			authLogin := auth.Group("")
+			authLogin.Use(middleware.LoginRateLimit())
+			{
+				authLogin.POST("/login", authHandler.Login)
+				authLogin.GET("/me", authHandler.GetMe)
+			}
 		}
 
 		// 管理者専用エンドポイント（新しい認証システム）
@@ -175,6 +180,7 @@ func main() {
 		
 		// 認証不要のエンドポイント
 		v1.Use(middleware.APIRateLimit()) // API呼び出し制限
+		v1.GET("/sessions", sessionHandler.ListAvailableSessions)
 		v1.GET("/sessions/:id/info", sessionHandler.GetSessionInfo)
 		v1.GET("/sessions/:id/status", sessionHandler.GetSessionStatus)
 
@@ -188,6 +194,7 @@ func main() {
 
 			// クイズ関連
 			authRequired.GET("/sessions/:id/current-question", quizHandler.GetCurrentQuestion)
+			authRequired.GET("/sessions/:id/questions", quizHandler.GetAllQuestions)
 			authRequired.POST("/sessions/:id/answers", quizHandler.SubmitAnswer)
 		}
 
@@ -198,9 +205,15 @@ func main() {
 			// セッション管理
 			adminSession.POST("/sessions", adminHandler.CreateSession)
 			adminSession.PUT("/sessions/:id/control", adminHandler.ControlSession)
+			adminSession.DELETE("/sessions/:id", adminHandler.DeleteSession)
 			adminSession.GET("/sessions/:id/stats", adminHandler.GetSessionStats)
 			adminSession.GET("/sessions/:id/results", adminHandler.GetResults)
 			adminSession.GET("/sessions/:id/export", adminHandler.ExportResults)
+
+			// 管理者用セッション情報取得
+			adminSession.GET("/sessions/:id/participants", sessionHandler.GetAdminParticipants)
+			adminSession.GET("/sessions/:id/current-question", quizHandler.GetAdminCurrentQuestion)
+			adminSession.GET("/sessions/:id/questions", quizHandler.GetAdminAllQuestions)
 
 			// クイズ管理
 			adminSession.POST("/sessions/:id/generate-question", quizHandler.GenerateQuestion)

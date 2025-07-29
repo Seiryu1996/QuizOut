@@ -8,8 +8,10 @@ import (
 type SessionUseCase interface {
 	CreateSession(ctx context.Context, title string, maxParticipants int, settings domain.Settings) (*domain.Session, error)
 	GetSession(ctx context.Context, sessionID string) (*domain.Session, error)
+	ListAvailableSessions(ctx context.Context) ([]*domain.Session, error)
 	StartSession(ctx context.Context, sessionID string) error
 	FinishSession(ctx context.Context, sessionID string) error
+	DeleteSession(ctx context.Context, sessionID string) error
 	JoinSession(ctx context.Context, sessionID, userID, displayName string) (*domain.Participant, error)
 	GetParticipants(ctx context.Context, sessionID string) ([]*domain.Participant, error)
 	GetActiveParticipants(ctx context.Context, sessionID string) ([]*domain.Participant, error)
@@ -18,6 +20,7 @@ type SessionUseCase interface {
 type QuizUseCase interface {
 	GenerateQuestion(ctx context.Context, sessionID string, round int, difficulty domain.Difficulty, category string) (*domain.Question, error)
 	GetCurrentQuestion(ctx context.Context, sessionID string) (*domain.Question, error)
+	GetAllQuestions(ctx context.Context, sessionID string) ([]*domain.Question, error)
 	SubmitAnswer(ctx context.Context, sessionID, userID, questionID string, selectedOption, responseTime int) (*domain.Answer, error)
 	ProcessRoundResults(ctx context.Context, sessionID string, questionID string) ([]*domain.Participant, []*domain.Participant, error)
 	NextRound(ctx context.Context, sessionID string) error

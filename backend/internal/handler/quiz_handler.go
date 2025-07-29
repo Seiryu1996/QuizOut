@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"quiz-app/internal/domain"
 	"quiz-app/internal/middleware"
@@ -86,6 +87,127 @@ func (h *QuizHandler) GetCurrentQuestion(c *gin.Context) {
 	utils.SuccessResponse(c, http.StatusOK, response)
 }
 
+// GET /api/v1/admin/sessions/:id/current-question (管理者専用)
+func (h *QuizHandler) GetAdminCurrentQuestion(c *gin.Context) {
+	sessionID := c.Param("id")
+	if sessionID == "" {
+		utils.BadRequestError(c, "Session ID is required")
+		return
+	}
+
+	question, err := h.quizUseCase.GetCurrentQuestion(c.Request.Context(), sessionID)
+	if err != nil {
+		if err == domain.ErrQuestionNotFound {
+			utils.NotFoundError(c, "No current question available")
+		} else {
+			utils.InternalServerError(c, "Failed to get current question")
+		}
+		return
+	}
+
+	response := map[string]interface{}{
+		"id":          question.ID,
+		"text":        question.Text,
+		"questionText": question.Text, // フロントエンド互換性のため
+		"options":     question.Options,
+		"correctAnswer": question.CorrectAnswer,
+		"round":       question.Round,
+		"category":    question.Category,
+		"difficulty":  string(question.Difficulty),
+		"createdAt":   question.CreatedAt,
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, response)
+}
+
+// GET /api/v1/sessions/:id/questions
+func (h *QuizHandler) GetAllQuestions(c *gin.Context) {
+	sessionID := c.Param("id")
+	if sessionID == "" {
+		utils.BadRequestError(c, "Session ID is required")
+		return
+	}
+
+	userID, exists := middleware.GetUserID(c)
+	if !exists {
+		utils.UnauthorizedError(c, "Authentication required")
+		return
+	}
+
+	// 参加者確認
+	participants, err := h.sessionUseCase.GetParticipants(c.Request.Context(), sessionID)
+	if err != nil {
+		utils.InternalServerError(c, "Failed to verify participation")
+		return
+	}
+
+	isParticipant := false
+	for _, p := range participants {
+		if p.UserID == userID {
+			isParticipant = true
+			break
+		}
+	}
+
+	if !isParticipant {
+		utils.ErrorResponse(c, http.StatusForbidden, "FORBIDDEN", "Not a participant of this session")
+		return
+	}
+
+	questions, err := h.quizUseCase.GetAllQuestions(c.Request.Context(), sessionID)
+	if err != nil {
+		utils.InternalServerError(c, "Failed to get questions")
+		return
+	}
+
+	questionData := make([]map[string]interface{}, len(questions))
+	for i, q := range questions {
+		questionData[i] = map[string]interface{}{
+			"id":        q.ID,
+			"text":      q.Text,
+			"options":   q.Options,
+			"round":     q.Round,
+			"category":  q.Category,
+			"difficulty": string(q.Difficulty),
+			"createdAt": q.CreatedAt,
+		}
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, questionData)
+}
+
+// GET /api/v1/admin/sessions/:id/questions (管理者専用)
+func (h *QuizHandler) GetAdminAllQuestions(c *gin.Context) {
+	sessionID := c.Param("id")
+	if sessionID == "" {
+		utils.BadRequestError(c, "Session ID is required")
+		return
+	}
+
+	questions, err := h.quizUseCase.GetAllQuestions(c.Request.Context(), sessionID)
+	if err != nil {
+		utils.InternalServerError(c, "Failed to get questions")
+		return
+	}
+
+	questionData := make([]map[string]interface{}, len(questions))
+	for i, q := range questions {
+		questionData[i] = map[string]interface{}{
+			"id":           q.ID,
+			"text":         q.Text,
+			"questionText": q.Text, // フロントエンド互換性のため
+			"options":      q.Options,
+			"correctAnswer": q.CorrectAnswer,
+			"round":        q.Round,
+			"category":     q.Category,
+			"difficulty":   string(q.Difficulty),
+			"createdAt":    q.CreatedAt,
+		}
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, questionData)
+}
+
 // POST /api/v1/sessions/:id/answers
 func (h *QuizHandler) SubmitAnswer(c *gin.Context) {
 	sessionID := c.Param("id")
@@ -155,17 +277,29 @@ func (h *QuizHandler) GenerateQuestion(c *gin.Context) {
 		return
 	}
 
-	// 管理者権限確認
-	claims, exists := middleware.GetUserClaims(c)
+	// 管理者権限確認（セッションベース認証用）
+	user, exists := c.Get("user")
 	if !exists {
+		// デバッグ用ログ
+		log.Printf("GenerateQuestion: No user in context")
 		utils.UnauthorizedError(c, "Authentication required")
 		return
 	}
 
-	if role, ok := claims["role"].(string); !ok || role != "admin" {
+	domainUser, ok := user.(*domain.User)
+	if !ok {
+		log.Printf("GenerateQuestion: Invalid user type: %T", user)
+		utils.UnauthorizedError(c, "Authentication required")
+		return
+	}
+	
+	if !domainUser.IsAdmin() {
+		log.Printf("GenerateQuestion: User %s is not admin", domainUser.Username)
 		utils.ErrorResponse(c, http.StatusForbidden, "FORBIDDEN", "Admin access required")
 		return
 	}
+	
+	log.Printf("GenerateQuestion: Admin user %s authenticated", domainUser.Username)
 
 	// セッション取得
 	session, err := h.sessionUseCase.GetSession(c.Request.Context(), sessionID)
@@ -174,8 +308,8 @@ func (h *QuizHandler) GenerateQuestion(c *gin.Context) {
 		return
 	}
 
-	if !session.IsActive() {
-		utils.ConflictError(c, "Session is not active")
+	if session.IsFinished() {
+		utils.ConflictError(c, "Session has finished")
 		return
 	}
 
@@ -223,14 +357,15 @@ func (h *QuizHandler) ProcessRoundResults(c *gin.Context) {
 		return
 	}
 
-	// 管理者権限確認
-	claims, exists := middleware.GetUserClaims(c)
+	// 管理者権限確認（セッションベース認証用）
+	user, exists := c.Get("user")
 	if !exists {
 		utils.UnauthorizedError(c, "Authentication required")
 		return
 	}
 
-	if role, ok := claims["role"].(string); !ok || role != "admin" {
+	domainUser, ok := user.(*domain.User)
+	if !ok || !domainUser.IsAdmin() {
 		utils.ErrorResponse(c, http.StatusForbidden, "FORBIDDEN", "Admin access required")
 		return
 	}
@@ -275,14 +410,15 @@ func (h *QuizHandler) NextRound(c *gin.Context) {
 		return
 	}
 
-	// 管理者権限確認
-	claims, exists := middleware.GetUserClaims(c)
+	// 管理者権限確認（セッションベース認証用）
+	user, exists := c.Get("user")
 	if !exists {
 		utils.UnauthorizedError(c, "Authentication required")
 		return
 	}
 
-	if role, ok := claims["role"].(string); !ok || role != "admin" {
+	domainUser, ok := user.(*domain.User)
+	if !ok || !domainUser.IsAdmin() {
 		utils.ErrorResponse(c, http.StatusForbidden, "FORBIDDEN", "Admin access required")
 		return
 	}

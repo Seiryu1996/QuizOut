@@ -113,7 +113,13 @@ func (rl *RateLimiter) cleanup() {
 
 // LoginRateLimit ログイン専用のレート制限（より厳しい制限）
 func LoginRateLimit() gin.HandlerFunc {
-	limiter := NewRateLimiter(5, time.Minute) // 1分間に5回まで
+	limiter := NewRateLimiter(20, time.Minute) // 1分間に20回まで（開発用に緩和）
+	return limiter.Middleware()
+}
+
+// AccessCodeRateLimit アクセスコード検証専用のレート制限
+func AccessCodeRateLimit() gin.HandlerFunc {
+	limiter := NewRateLimiter(10, time.Minute) // 1分間に10回まで
 	return limiter.Middleware()
 }
 

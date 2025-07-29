@@ -3,11 +3,17 @@ package domain
 import "errors"
 
 var (
-	// Session関連エラー
-	ErrSessionNotFound      = errors.New("session not found")
-	ErrInvalidSessionStatus = errors.New("invalid session status")
-	ErrSessionFull          = errors.New("session is full")
-	ErrSessionNotActive     = errors.New("session is not active")
+	// Game関連エラー (Session関連エラーも互換性のため残す)
+	ErrGameNotFound      = errors.New("game not found")
+	ErrInvalidGameStatus = errors.New("invalid game status")
+	ErrGameFull          = errors.New("game is full")
+	ErrGameNotActive     = errors.New("game is not active")
+	
+	// Session関連エラー (Legacy - 互換性のため残す)
+	ErrSessionNotFound      = ErrGameNotFound
+	ErrInvalidSessionStatus = ErrInvalidGameStatus
+	ErrSessionFull          = ErrGameFull
+	ErrSessionNotActive     = ErrGameNotActive
 
 	// User関連エラー
 	ErrUserNotFound         = errors.New("user not found")

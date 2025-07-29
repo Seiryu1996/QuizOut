@@ -12,7 +12,7 @@ import { QuizPresenter } from './QuizPresenter';
 export const QuizContainer: React.FC = () => {
   const params = useParams();
   const router = useRouter();
-  const sessionId = params?.id as string;
+  const gameId = params?.id as string;
 
   const { isAuthenticated, user, loading: authLoading } = useAuth();
   const { displayName } = useUserStore();
@@ -22,10 +22,12 @@ export const QuizContainer: React.FC = () => {
   const [joiningError, setJoiningError] = useState<string | null>(null);
 
   const {
-    currentSession,
-    setCurrentSession,
+    currentGame,
+    setCurrentGame,
     participants,
     setParticipants,
+    questions,
+    setQuestions,
     currentQuestion,
     timeRemaining,
     hasAnswered,
@@ -48,7 +50,7 @@ export const QuizContainer: React.FC = () => {
     submitAnswer: wsSubmitAnswer,
     connectionError 
   } = useWebSocket({ 
-    sessionId, 
+    sessionId: gameId, 
     autoConnect: isAuthenticated 
   });
 
@@ -59,54 +61,72 @@ export const QuizContainer: React.FC = () => {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  // セッション情報取得
+  // ゲーム情報取得
   useEffect(() => {
-    const fetchSessionInfo = async () => {
-      if (!sessionId) return;
+    const fetchGameInfo = async () => {
+      if (!gameId) return;
 
       try {
-        const response = await api.getSessionInfo(sessionId);
+        const response = await api.getSessionInfo(gameId);
         if (response.success && response.data) {
-          setCurrentSession(response.data);
+          setCurrentGame(response.data);
         } else {
-          setError(response.error?.message || 'セッション情報の取得に失敗しました');
+          setError(response.error?.message || 'ゲーム情報の取得に失敗しました');
         }
       } catch (error) {
-        console.error('Failed to fetch session info:', error);
-        setError('セッション情報の取得に失敗しました');
+        console.error('Failed to fetch game info:', error);
+        setError('ゲーム情報の取得に失敗しました');
       }
     };
 
-    fetchSessionInfo();
-  }, [sessionId, api, setCurrentSession, setError]);
+    fetchGameInfo();
+  }, [gameId]);
 
-  // セッション参加
+  // 問題一覧取得
   useEffect(() => {
-    const joinSession = async () => {
-      if (!sessionId || !isAuthenticated || !displayName || hasJoined) return;
+    const fetchQuestions = async () => {
+      if (!gameId || !isAuthenticated) return;
+
+      try {
+        const response = await api.getAllQuestions(gameId);
+        if (response.success && response.data) {
+          setQuestions(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch questions:', error);
+      }
+    };
+
+    fetchQuestions();
+  }, [gameId, isAuthenticated]);
+
+  // ゲーム参加
+  useEffect(() => {
+    const joinGame = async () => {
+      if (!gameId || !isAuthenticated || !displayName || hasJoined) return;
 
       try {
         setJoiningError(null);
-        const response = await api.joinSession(sessionId, { displayName });
+        const response = await api.joinSession(gameId, { displayName });
         
         if (response.success) {
           setHasJoined(true);
           // 参加者一覧を取得
-          const participantsResponse = await api.getParticipants(sessionId);
+          const participantsResponse = await api.getParticipants(gameId);
           if (participantsResponse.success && participantsResponse.data) {
             setParticipants(participantsResponse.data);
           }
         } else {
-          setJoiningError(response.error?.message || 'セッションへの参加に失敗しました');
+          setJoiningError(response.error?.message || 'ゲームへの参加に失敗しました');
         }
       } catch (error) {
-        console.error('Failed to join session:', error);
-        setJoiningError('セッションへの参加に失敗しました');
+        console.error('Failed to join game:', error);
+        setJoiningError('ゲームへの参加に失敗しました');
       }
     };
 
-    joinSession();
-  }, [sessionId, isAuthenticated, displayName, hasJoined, api, setParticipants]);
+    joinGame();
+  }, [gameId, isAuthenticated, displayName, hasJoined]);
 
   // 回答送信
   const handleAnswer = async (selectedOption: number, responseTime: number) => {
@@ -114,7 +134,7 @@ export const QuizContainer: React.FC = () => {
 
     try {
       // APIで回答送信
-      const response = await api.submitAnswer(sessionId, {
+      const response = await api.submitAnswer(gameId, {
         questionId: currentQuestion.id,
         selectedOption,
         responseTime,
@@ -141,7 +161,7 @@ export const QuizContainer: React.FC = () => {
   };
 
   // ローディング状態
-  if (authLoading || !currentSession) {
+  if (authLoading || !currentGame) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -175,8 +195,9 @@ export const QuizContainer: React.FC = () => {
 
   return (
     <QuizPresenter
-      session={currentSession}
+      game={currentGame}
       participants={participants}
+      questions={questions}
       currentQuestion={currentQuestion}
       timeRemaining={timeRemaining}
       hasAnswered={hasAnswered}
