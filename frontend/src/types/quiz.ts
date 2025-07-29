@@ -1,4 +1,4 @@
-export interface Session {
+export interface Game {
   id: string;
   title: string;
   status: 'waiting' | 'active' | 'finished';
@@ -6,16 +6,22 @@ export interface Session {
   maxParticipants: number;
   createdAt: string;
   updatedAt: string;
-  settings: SessionSettings;
+  settings: GameSettings;
   participantCount?: number;
   activeCount?: number;
 }
 
-export interface SessionSettings {
+// Legacy alias for backward compatibility
+export interface Session extends Game {}
+
+export interface GameSettings {
   timeLimit: number;
   revivalEnabled: boolean;
   revivalCount: number;
 }
+
+// Legacy alias for backward compatibility
+export interface SessionSettings extends GameSettings {}
 
 export interface Question {
   id: string;

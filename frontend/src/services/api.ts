@@ -6,7 +6,7 @@ import {
   ControlSessionRequest,
   StartRevivalRequest 
 } from '@/types/api';
-import { Session, Question, Answer, Participant } from '@/types/quiz';
+import { Game, Question, Answer, Participant } from '@/types/quiz';
 
 class APIClient {
   private baseURL: string;
@@ -29,7 +29,9 @@ class APIClient {
       ...(options.headers as Record<string, string> || {}),
     };
 
-    if (token) {
+    // Admin endpoints use session-based auth, so don't send Bearer token
+    const isAdminEndpoint = endpoint.startsWith('/api/v1/admin/');
+    if (token && !isAdminEndpoint) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
@@ -37,6 +39,8 @@ class APIClient {
       const response = await fetch(url, {
         ...options,
         headers,
+        // Include credentials for admin endpoints to send session cookies
+        credentials: isAdminEndpoint ? 'include' : 'same-origin',
       });
 
       const data = await response.json();
@@ -63,9 +67,19 @@ class APIClient {
     }
   }
 
-  // Session API
-  async getSessionInfo(sessionId: string): Promise<APIResponse<Session>> {
-    return this.request<Session>(`/api/v1/sessions/${sessionId}/info`);
+  // Game API
+  async listAvailableGames(): Promise<APIResponse<Game[]>> {
+    return this.request<Game[]>('/api/v1/sessions');
+  }
+
+  // Game methods (preferred)
+  async getGameInfo(gameId: string): Promise<APIResponse<Game>> {
+    return this.request<Game>(`/api/v1/sessions/${gameId}`);
+  }
+
+  // Legacy session methods (for backward compatibility)
+  async getSessionInfo(sessionId: string): Promise<APIResponse<Game>> {
+    return this.request<Game>(`/api/v1/sessions/${sessionId}/info`);
   }
 
   async getSessionStatus(sessionId: string): Promise<APIResponse<{
@@ -98,9 +112,28 @@ class APIClient {
     return this.request<Participant[]>(`/api/v1/sessions/${sessionId}/participants`);
   }
 
+  // Admin version of getParticipants
+  async getAdminParticipants(sessionId: string): Promise<APIResponse<Participant[]>> {
+    return this.request<Participant[]>(`/api/v1/admin/sessions/${sessionId}/participants`);
+  }
+
   // Quiz API
   async getCurrentQuestion(sessionId: string): Promise<APIResponse<Question>> {
     return this.request<Question>(`/api/v1/sessions/${sessionId}/current-question`);
+  }
+
+  // Admin version of getCurrentQuestion
+  async getAdminCurrentQuestion(sessionId: string): Promise<APIResponse<Question>> {
+    return this.request<Question>(`/api/v1/admin/sessions/${sessionId}/current-question`);
+  }
+
+  async getAllQuestions(sessionId: string): Promise<APIResponse<Question[]>> {
+    return this.request<Question[]>(`/api/v1/sessions/${sessionId}/questions`);
+  }
+
+  // Admin version of getAllQuestions
+  async getAdminAllQuestions(sessionId: string): Promise<APIResponse<Question[]>> {
+    return this.request<Question[]>(`/api/v1/admin/sessions/${sessionId}/questions`);
   }
 
   async submitAnswer(sessionId: string, request: SubmitAnswerRequest): Promise<APIResponse<Answer>> {
@@ -111,8 +144,8 @@ class APIClient {
   }
 
   // Admin API
-  async createSession(request: CreateSessionRequest): Promise<APIResponse<Session>> {
-    return this.request<Session>('/api/v1/admin/sessions', {
+  async createSession(request: CreateSessionRequest): Promise<APIResponse<Game>> {
+    return this.request<Game>('/api/v1/admin/sessions', {
       method: 'POST',
       body: JSON.stringify(request),
     });
@@ -181,16 +214,9 @@ class APIClient {
   }
 
   async exportResults(sessionId: string): Promise<Blob | null> {
-    const token = this.getAuthToken();
-    const headers: Record<string, string> = {};
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
     try {
       const response = await fetch(`${this.baseURL}/api/v1/admin/sessions/${sessionId}/export`, {
-        headers,
+        credentials: 'include', // Use session-based auth for admin endpoint
       });
 
       if (response.ok) {
@@ -206,6 +232,12 @@ class APIClient {
   async skipQuestion(sessionId: string): Promise<APIResponse<{ message: string }>> {
     return this.request(`/api/v1/admin/sessions/${sessionId}/skip-question`, {
       method: 'POST',
+    });
+  }
+
+  async deleteSession(sessionId: string): Promise<APIResponse<{ message: string }>> {
+    return this.request(`/api/v1/admin/sessions/${sessionId}`, {
+      method: 'DELETE',
     });
   }
 }

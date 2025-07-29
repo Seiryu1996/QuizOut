@@ -3,15 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
-import { useAPI } from '@/hooks/useAPI';
+import { useAdminAPI } from '@/hooks/useAPI';
 import { Button } from '@/components/atoms/Button';
 
 export default function AdminPage() {
   const router = useRouter();
   const { isAuthenticated, isAdmin, loading, error } = useAdminAuth();
-  const api = useAPI();
+  const api = useAdminAPI();
   
-  const [sessionTitle, setSessionTitle] = useState('');
+  const [gameTitle, setGameTitle] = useState('');
   const [maxParticipants, setMaxParticipants] = useState(200);
   const [timeLimit, setTimeLimit] = useState(30);
   const [revivalEnabled, setRevivalEnabled] = useState(true);
@@ -26,16 +26,16 @@ export default function AdminPage() {
     }
   }, [loading, isAuthenticated, error, router]);
 
-  const handleCreateSession = async () => {
-    if (!sessionTitle.trim()) {
-      alert('セッション名を入力してください');
+  const handleCreateGame = async () => {
+    if (!gameTitle.trim()) {
+      alert('ゲーム名を入力してください');
       return;
     }
 
     setIsCreating(true);
     try {
       const response = await api.createSession({
-        title: sessionTitle,
+        title: gameTitle,
         maxParticipants,
         timeLimit,
         revivalEnabled,
@@ -43,14 +43,14 @@ export default function AdminPage() {
       });
 
       if (response.success && response.data) {
-        // セッション作成成功時は管理画面に遷移
+        // ゲーム作成成功時は管理画面に遷移
         router.push(`/admin/session/${response.data.id}`);
       } else {
-        alert('セッションの作成に失敗しました');
+        alert('ゲームの作成に失敗しました');
       }
     } catch (error) {
-      console.error('Create session error:', error);
-      alert('セッションの作成に失敗しました');
+      console.error('Create game error:', error);
+      alert('ゲームの作成に失敗しました');
     } finally {
       setIsCreating(false);
     }
@@ -126,21 +126,21 @@ export default function AdminPage() {
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">管理者ダッシュボード</h1>
-          <p className="text-gray-600">クイズセッションを作成・管理できます</p>
+          <p className="text-gray-600">クイズゲームを作成・管理できます</p>
         </div>
 
         <div className="card">
-          <h2 className="text-xl font-semibold mb-6">新しいセッションを作成</h2>
+          <h2 className="text-xl font-semibold mb-6">新しいゲームを作成</h2>
           
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                セッション名
+                ゲーム名
               </label>
               <input
                 type="text"
-                value={sessionTitle}
-                onChange={(e) => setSessionTitle(e.target.value)}
+                value={gameTitle}
+                onChange={(e) => setGameTitle(e.target.value)}
                 placeholder="忘年会クイズ大会"
                 className="input-field"
               />
@@ -204,13 +204,13 @@ export default function AdminPage() {
             )}
 
             <Button
-              onClick={handleCreateSession}
+              onClick={handleCreateGame}
               loading={isCreating}
-              disabled={!sessionTitle.trim()}
+              disabled={!gameTitle.trim()}
               className="w-full"
               size="lg"
             >
-              セッションを作成
+              ゲームを作成
             </Button>
           </div>
         </div>

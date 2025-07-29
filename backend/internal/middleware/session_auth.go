@@ -70,9 +70,12 @@ func SessionAuthMiddleware(userRepo repository.UserRepository) gin.HandlerFunc {
 // AdminSessionMiddleware 管理者セッション認証ミドルウェア
 func AdminSessionMiddleware(userRepo repository.UserRepository) gin.HandlerFunc {
 	return gin.HandlerFunc(func(c *gin.Context) {
+		log.Printf("AdminSessionMiddleware: Processing request for %s", c.Request.URL.Path)
 		session := sessions.Default(c)
 		userIDInterface := session.Get("user_id")
+		log.Printf("AdminSessionMiddleware: user_id from session = %v", userIDInterface)
 		if userIDInterface == nil {
+			log.Printf("AdminSessionMiddleware: No user_id in session")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "ログインが必要です"})
 			c.Abort()
 			return

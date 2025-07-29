@@ -33,6 +33,7 @@ const (
 	MessageTypeParticipantJoin  MessageType = "participant_join"
 	MessageTypeParticipantLeave MessageType = "participant_leave"
 	MessageTypeSessionUpdate    MessageType = "session_update"
+	MessageTypeSessionDeleted   MessageType = "session_deleted"
 	MessageTypeRevivalStart     MessageType = "revival_start"
 	MessageTypeRevivalResult    MessageType = "revival_result"
 	MessageTypeError            MessageType = "error"

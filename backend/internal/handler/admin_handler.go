@@ -305,3 +305,29 @@ func (h *AdminHandler) SkipQuestion(c *gin.Context) {
 		"message": "Question skipped successfully",
 	})
 }
+
+// DELETE /api/v1/admin/sessions/:id
+func (h *AdminHandler) DeleteSession(c *gin.Context) {
+	sessionID := c.Param("id")
+	if sessionID == "" {
+		utils.BadRequestError(c, "Session ID is required")
+		return
+	}
+
+	err := h.sessionUseCase.DeleteSession(c.Request.Context(), sessionID)
+	if err != nil {
+		switch err {
+		case domain.ErrSessionNotFound:
+			utils.NotFoundError(c, "Session not found")
+		case domain.ErrInvalidSessionStatus:
+			utils.ConflictError(c, "Cannot delete active session")
+		default:
+			utils.InternalServerError(c, "Failed to delete session")
+		}
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, map[string]string{
+		"message": "Session deleted successfully",
+	})
+}

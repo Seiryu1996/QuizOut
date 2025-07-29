@@ -1,12 +1,13 @@
 import { create } from 'zustand';
-import { Session, Question, Participant, Answer } from '@/types/quiz';
+import { Game, Question, Participant, Answer } from '@/types/quiz';
 
 interface QuizState {
-  // Session state
-  currentSession: Session | null;
+  // Game state
+  currentGame: Game | null;
   participants: Participant[];
   
   // Question state
+  questions: Question[];
   currentQuestion: Question | null;
   timeRemaining: number;
   isAnswering: boolean;
@@ -34,14 +35,16 @@ interface QuizState {
 }
 
 interface QuizActions {
-  // Session actions
-  setCurrentSession: (session: Session | null) => void;
-  updateSessionStatus: (status: Session['status']) => void;
+  // Game actions
+  setCurrentGame: (game: Game | null) => void;
+  updateGameStatus: (status: Game['status']) => void;
   setParticipants: (participants: Participant[]) => void;
   addParticipant: (participant: Participant) => void;
   removeParticipant: (userId: string) => void;
   
   // Question actions
+  setQuestions: (questions: Question[]) => void;
+  addQuestion: (question: Question) => void;
   setCurrentQuestion: (question: Question | null) => void;
   setTimeRemaining: (time: number) => void;
   setIsAnswering: (isAnswering: boolean) => void;
@@ -70,8 +73,9 @@ interface QuizActions {
 }
 
 const initialState: QuizState = {
-  currentSession: null,
+  currentGame: null,
   participants: [],
+  questions: [],
   currentQuestion: null,
   timeRemaining: 0,
   isAnswering: false,
@@ -89,12 +93,12 @@ const initialState: QuizState = {
 export const useQuizStore = create<QuizState & QuizActions>((set, get) => ({
   ...initialState,
   
-  // Session actions
-  setCurrentSession: (session) => set({ currentSession: session }),
+  // Game actions
+  setCurrentGame: (game) => set({ currentGame: game }),
   
-  updateSessionStatus: (status) => set((state) => ({
-    currentSession: state.currentSession ? {
-      ...state.currentSession,
+  updateGameStatus: (status) => set((state) => ({
+    currentGame: state.currentGame ? {
+      ...state.currentGame,
       status
     } : null
   })),
@@ -110,6 +114,12 @@ export const useQuizStore = create<QuizState & QuizActions>((set, get) => ({
   })),
   
   // Question actions
+  setQuestions: (questions) => set({ questions }),
+  
+  addQuestion: (question) => set((state) => ({
+    questions: [...state.questions.filter(q => q.id !== question.id), question].sort((a, b) => a.round - b.round)
+  })),
+  
   setCurrentQuestion: (question) => set({ 
     currentQuestion: question,
     hasAnswered: false,
@@ -149,6 +159,7 @@ export const useQuizStore = create<QuizState & QuizActions>((set, get) => ({
     timeRemaining: 0,
     isAnswering: false,
     hasAnswered: false,
-    roundResults: null
+    roundResults: null,
+    questions: []
   }),
 }));

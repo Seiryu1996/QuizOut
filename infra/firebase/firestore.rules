@@ -1,29 +1,50 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // セッション
-    match /sessions/{sessionId} {
-      allow read, write: if true; // 開発環境用（本番では適切な認証ルールを設定）
-      
-      // 参加者サブコレクション
-      match /participants/{participantId} {
-        allow read, write: if true;
-      }
-      
-      // 問題サブコレクション
-      match /questions/{questionId} {
-        allow read, write: if true;
-      }
-      
-      // 回答サブコレクション
-      match /answers/{answerId} {
-        allow read, write: if true;
-      }
-    }
-    
-    // ユーザー
-    match /users/{userId} {
+    // 開発環境用: 全てのアクセスを許可（本番では下記のルールに変更）
+    match /{document=**} {
       allow read, write: if true;
     }
+    
+    /* 本番環境用ルール（開発完了後に上記を削除し、以下を有効化）
+    
+    // ユーザードキュメント
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // セッション/ゲーム
+    match /sessions/{sessionId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        (request.auth.token.admin == true || 
+         (resource != null && request.auth.uid in resource.data.get('adminIds', [])));
+    }
+    
+    // 参加者
+    match /participants/{participantId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || 
+         request.auth.token.admin == true);
+    }
+    
+    // 問題
+    match /questions/{questionId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+    
+    // 回答
+    match /answers/{answerId} {
+      allow read: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || 
+         request.auth.token.admin == true);
+      allow write: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+    }
+    
+    */
   }
 }

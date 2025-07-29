@@ -1,14 +1,16 @@
 import React from 'react';
-import { Session, Question, Participant } from '@/types/quiz';
-import { SessionHeader } from '@/components/organisms/SessionHeader';
+import { Game, Question, Participant } from '@/types/quiz';
+import { GameHeader } from '@/components/organisms/GameHeader';
 import { QuizBoard } from '@/components/organisms/QuizBoard';
+import { QuestionList } from '@/components/organisms/QuestionList';
 import { ParticipantsList } from '@/components/molecules/ParticipantsList';
 import { RoundResult } from '@/components/molecules/RoundResult';
 import { Loading } from '@/components/atoms/Loading';
 
 interface QuizPresenterProps {
-  session: Session;
+  game: Game;
   participants: Participant[];
+  questions: Question[];
   currentQuestion: Question | null;
   timeRemaining: number;
   hasAnswered: boolean;
@@ -30,8 +32,9 @@ interface QuizPresenterProps {
 }
 
 export const QuizPresenter: React.FC<QuizPresenterProps> = ({
-  session,
+  game,
   participants,
+  questions,
   currentQuestion,
   timeRemaining,
   hasAnswered,
@@ -73,10 +76,11 @@ export const QuizPresenter: React.FC<QuizPresenterProps> = ({
     return (
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-4xl mx-auto">
-          <SessionHeader
-            session={session}
+          <GameHeader
+            game={game}
             participantCount={participants.length}
             connectionStatus={connectionStatus}
+            onGoHome={onGoHome}
             className="mb-6"
           />
           
@@ -113,10 +117,11 @@ export const QuizPresenter: React.FC<QuizPresenterProps> = ({
     return (
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-4xl mx-auto">
-          <SessionHeader
-            session={session}
+          <GameHeader
+            game={game}
             participantCount={participants.length}
             connectionStatus={connectionStatus}
+            onGoHome={onGoHome}
             className="mb-6"
           />
           
@@ -166,10 +171,11 @@ export const QuizPresenter: React.FC<QuizPresenterProps> = ({
     return (
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-4xl mx-auto">
-          <SessionHeader
-            session={session}
+          <GameHeader
+            game={game}
             participantCount={participants.length}
             connectionStatus={connectionStatus}
+            onGoHome={onGoHome}
             className="mb-6"
           />
           
@@ -186,17 +192,18 @@ export const QuizPresenter: React.FC<QuizPresenterProps> = ({
   }
 
   // ゲーム終了
-  if (session.status === 'finished') {
+  if (game.status === 'finished') {
     const winner = activeParticipants.length === 1 ? activeParticipants[0] : null;
     const isUserWinner = winner?.userId === currentUserId;
 
     return (
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-4xl mx-auto">
-          <SessionHeader
-            session={session}
+          <GameHeader
+            game={game}
             participantCount={participants.length}
             connectionStatus={connectionStatus}
+            onGoHome={onGoHome}
             className="mb-6"
           />
           
@@ -236,17 +243,17 @@ export const QuizPresenter: React.FC<QuizPresenterProps> = ({
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-6xl mx-auto">
         {/* ヘッダー */}
-        <SessionHeader
-          session={session}
+        <GameHeader
+          game={game}
           participantCount={participants.length}
           connectionStatus={connectionStatus}
           className="mb-6"
         />
 
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid lg:grid-cols-4 gap-6">
           {/* メインコンテンツ */}
           <div className="lg:col-span-2">
-            {session.status === 'waiting' ? (
+            {game.status === 'waiting' ? (
               <div className="card text-center">
                 <div className="text-6xl mb-4">⏳</div>
                 <h2 className="text-2xl font-semibold text-gray-900 mb-2">
@@ -257,20 +264,33 @@ export const QuizPresenter: React.FC<QuizPresenterProps> = ({
                 </p>
               </div>
             ) : (
-              <QuizBoard
-                question={currentQuestion}
-                timeRemaining={timeRemaining}
-                totalTime={session.settings.timeLimit}
-                onAnswer={onAnswer}
-                hasAnswered={hasAnswered}
-                showResults={false}
-                isLoading={isLoading}
-              />
+              <div className="space-y-6">
+                <QuizBoard
+                  question={currentQuestion}
+                  timeRemaining={timeRemaining}
+                  totalTime={game.settings.timeLimit}
+                  onAnswer={onAnswer}
+                  hasAnswered={hasAnswered}
+                  showResults={false}
+                  isLoading={isLoading}
+                />
+                
+                {/* 問題一覧 */}
+                {questions.length > 0 && (
+                  <div className="card">
+                    <QuestionList
+                      questions={questions}
+                      currentRound={game.currentRound}
+                      showAnswers={false}
+                    />
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
           {/* サイドバー */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-2">
             <ParticipantsList
               participants={participants}
               currentUserId={currentUserId}

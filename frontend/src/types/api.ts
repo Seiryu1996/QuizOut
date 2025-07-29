@@ -11,9 +11,12 @@ export interface APIError {
 }
 
 // Request/Response types
-export interface JoinSessionRequest {
+export interface JoinGameRequest {
   displayName: string;
 }
+
+// Legacy alias for backward compatibility
+export interface JoinSessionRequest extends JoinGameRequest {}
 
 export interface SubmitAnswerRequest {
   questionId: string;
@@ -21,7 +24,7 @@ export interface SubmitAnswerRequest {
   responseTime: number;
 }
 
-export interface CreateSessionRequest {
+export interface CreateGameRequest {
   title: string;
   maxParticipants?: number;
   timeLimit?: number;
@@ -29,9 +32,15 @@ export interface CreateSessionRequest {
   revivalCount?: number;
 }
 
-export interface ControlSessionRequest {
+// Legacy alias for backward compatibility
+export interface CreateSessionRequest extends CreateGameRequest {}
+
+export interface ControlGameRequest {
   action: 'start' | 'finish';
 }
+
+// Legacy alias for backward compatibility
+export interface ControlSessionRequest extends ControlGameRequest {}
 
 export interface StartRevivalRequest {
   count: number;
