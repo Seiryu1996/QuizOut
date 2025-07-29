@@ -4,24 +4,35 @@ import (
 	"time"
 )
 
-type SessionStatus string
+type GameStatus string
 
 const (
-	SessionStatusWaiting  SessionStatus = "waiting"
-	SessionStatusActive   SessionStatus = "active"
-	SessionStatusFinished SessionStatus = "finished"
+	GameStatusWaiting  GameStatus = "waiting"
+	GameStatusActive   GameStatus = "active" 
+	GameStatusFinished GameStatus = "finished"
 )
 
-type Session struct {
-	ID              string        `json:"id" firestore:"id"`
-	Title           string        `json:"title" firestore:"title"`
-	Status          SessionStatus `json:"status" firestore:"status"`
-	CurrentRound    int           `json:"currentRound" firestore:"currentRound"`
-	MaxParticipants int           `json:"maxParticipants" firestore:"maxParticipants"`
-	CreatedAt       time.Time     `json:"createdAt" firestore:"createdAt"`
-	UpdatedAt       time.Time     `json:"updatedAt" firestore:"updatedAt"`
-	Settings        Settings      `json:"settings" firestore:"settings"`
+// Legacy aliases for backward compatibility
+type SessionStatus = GameStatus
+const (
+	SessionStatusWaiting  = GameStatusWaiting
+	SessionStatusActive   = GameStatusActive
+	SessionStatusFinished = GameStatusFinished
+)
+
+type Game struct {
+	ID              string     `json:"id" firestore:"id"`
+	Title           string     `json:"title" firestore:"title"`
+	Status          GameStatus `json:"status" firestore:"status"`
+	CurrentRound    int        `json:"currentRound" firestore:"currentRound"`
+	MaxParticipants int        `json:"maxParticipants" firestore:"maxParticipants"`
+	CreatedAt       time.Time  `json:"createdAt" firestore:"createdAt"`
+	UpdatedAt       time.Time  `json:"updatedAt" firestore:"updatedAt"`
+	Settings        Settings   `json:"settings" firestore:"settings"`
 }
+
+// Legacy alias for backward compatibility
+type Session = Game
 
 type Settings struct {
 	TimeLimit      int  `json:"timeLimit" firestore:"timeLimit"`           // 秒
@@ -29,11 +40,11 @@ type Settings struct {
 	RevivalCount   int  `json:"revivalCount" firestore:"revivalCount"`     // 復活可能人数
 }
 
-func NewSession(title string, maxParticipants int, settings Settings) *Session {
+func NewGame(title string, maxParticipants int, settings Settings) *Game {
 	now := time.Now()
-	return &Session{
+	return &Game{
 		Title:           title,
-		Status:          SessionStatusWaiting,
+		Status:          GameStatusWaiting,
 		CurrentRound:    0,
 		MaxParticipants: maxParticipants,
 		CreatedAt:       now,
@@ -42,42 +53,47 @@ func NewSession(title string, maxParticipants int, settings Settings) *Session {
 	}
 }
 
-func (s *Session) Start() error {
-	if s.Status != SessionStatusWaiting {
-		return ErrInvalidSessionStatus
+// Legacy function for backward compatibility
+func NewSession(title string, maxParticipants int, settings Settings) *Session {
+	return NewGame(title, maxParticipants, settings)
+}
+
+func (g *Game) Start() error {
+	if g.Status != GameStatusWaiting {
+		return ErrInvalidGameStatus
 	}
-	s.Status = SessionStatusActive
-	s.CurrentRound = 1
-	s.UpdatedAt = time.Now()
+	g.Status = GameStatusActive
+	g.CurrentRound = 1
+	g.UpdatedAt = time.Now()
 	return nil
 }
 
-func (s *Session) Finish() error {
-	if s.Status != SessionStatusActive {
-		return ErrInvalidSessionStatus
+func (g *Game) Finish() error {
+	if g.Status != GameStatusActive {
+		return ErrInvalidGameStatus
 	}
-	s.Status = SessionStatusFinished
-	s.UpdatedAt = time.Now()
+	g.Status = GameStatusFinished
+	g.UpdatedAt = time.Now()
 	return nil
 }
 
-func (s *Session) NextRound() error {
-	if s.Status != SessionStatusActive {
-		return ErrInvalidSessionStatus
+func (g *Game) NextRound() error {
+	if g.Status != GameStatusActive {
+		return ErrInvalidGameStatus
 	}
-	s.CurrentRound++
-	s.UpdatedAt = time.Now()
+	g.CurrentRound++
+	g.UpdatedAt = time.Now()
 	return nil
 }
 
-func (s *Session) IsActive() bool {
-	return s.Status == SessionStatusActive
+func (g *Game) IsActive() bool {
+	return g.Status == GameStatusActive
 }
 
-func (s *Session) IsWaiting() bool {
-	return s.Status == SessionStatusWaiting
+func (g *Game) IsWaiting() bool {
+	return g.Status == GameStatusWaiting
 }
 
-func (s *Session) IsFinished() bool {
-	return s.Status == SessionStatusFinished
+func (g *Game) IsFinished() bool {
+	return g.Status == GameStatusFinished
 }

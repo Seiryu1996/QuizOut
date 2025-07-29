@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"quiz-app/internal/domain"
 	"quiz-app/internal/middleware"
 	"quiz-app/internal/usecase"
 	"quiz-app/pkg/utils"
@@ -23,6 +24,48 @@ func NewSessionHandler(sessionUseCase usecase.SessionUseCase, userUseCase usecas
 
 type JoinSessionRequest struct {
 	DisplayName string `json:"displayName" binding:"required"`
+}
+
+// GET /api/v1/sessions
+func (h *SessionHandler) ListAvailableSessions(c *gin.Context) {
+	sessions, err := h.sessionUseCase.ListAvailableSessions(c.Request.Context())
+	if err != nil {
+		utils.InternalServerError(c, "Failed to get available sessions")
+		return
+	}
+
+	response := make([]map[string]interface{}, len(sessions))
+	for i, session := range sessions {
+		// Get participant count for each session
+		participants, err := h.sessionUseCase.GetParticipants(c.Request.Context(), session.ID)
+		if err != nil {
+			// Log error but continue with 0 count
+			participants = []*domain.Participant{}
+		}
+
+		activeParticipants, err := h.sessionUseCase.GetActiveParticipants(c.Request.Context(), session.ID)
+		if err != nil {
+			activeParticipants = []*domain.Participant{}
+		}
+
+		response[i] = map[string]interface{}{
+			"id":              session.ID,
+			"title":           session.Title,
+			"status":          string(session.Status),
+			"currentRound":    session.CurrentRound,
+			"maxParticipants": session.MaxParticipants,
+			"createdAt":       session.CreatedAt,
+			"settings": map[string]interface{}{
+				"timeLimit":      session.Settings.TimeLimit,
+				"revivalEnabled": session.Settings.RevivalEnabled,
+				"revivalCount":   session.Settings.RevivalCount,
+			},
+			"participantCount": len(participants),
+			"activeCount":      len(activeParticipants),
+		}
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, response)
 }
 
 // GET /api/v1/sessions/:id/info
@@ -173,6 +216,35 @@ func (h *SessionHandler) GetParticipants(c *gin.Context) {
 
 	response := make([]map[string]interface{}, len(activeParticipants))
 	for i, p := range activeParticipants {
+		response[i] = map[string]interface{}{
+			"userId":      p.UserID,
+			"displayName": p.DisplayName,
+			"status":      string(p.Status),
+			"score":       p.Score,
+			"joinedAt":    p.JoinedAt,
+		}
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, response)
+}
+
+// GET /api/v1/admin/sessions/:id/participants (管理者専用)
+func (h *SessionHandler) GetAdminParticipants(c *gin.Context) {
+	sessionID := c.Param("id")
+	if sessionID == "" {
+		utils.BadRequestError(c, "Session ID is required")
+		return
+	}
+
+	// 全参加者を取得（管理者なので参加者チェック不要）
+	participants, err := h.sessionUseCase.GetParticipants(c.Request.Context(), sessionID)
+	if err != nil {
+		utils.InternalServerError(c, "Failed to get participants")
+		return
+	}
+
+	response := make([]map[string]interface{}, len(participants))
+	for i, p := range participants {
 		response[i] = map[string]interface{}{
 			"userId":      p.UserID,
 			"displayName": p.DisplayName,

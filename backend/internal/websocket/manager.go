@@ -122,6 +122,20 @@ func (m *Manager) NotifySessionUpdate(sessionID string, session *domain.Session)
 	m.hub.BroadcastToSession(sessionID, msg)
 }
 
+// セッション削除の通知
+func (m *Manager) NotifySessionDeleted(sessionID string) {
+	msg := Message{
+		Type:      string(MessageTypeSessionDeleted),
+		SessionID: sessionID,
+		Data: map[string]interface{}{
+			"message": "Session has been deleted",
+		},
+		Timestamp: getCurrentTimestamp(),
+	}
+
+	m.hub.BroadcastToSession(sessionID, msg)
+}
+
 // 敗者復活戦開始の通知
 func (m *Manager) NotifyRevivalStart(sessionID string, candidates []*domain.Participant) {
 	candidateData := make([]map[string]interface{}, len(candidates))

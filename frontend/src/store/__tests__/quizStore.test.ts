@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { useQuizStore } from '../quizStore';
-import { Session, Question, Participant, Answer } from '@/types/quiz';
+import { Game, Question, Participant, Answer } from '@/types/quiz';
 
 describe('useQuizStore', () => {
   beforeEach(() => {
@@ -10,12 +10,14 @@ describe('useQuizStore', () => {
     });
   });
 
-  const mockSession: Session = {
+  const mockGame: Game = {
     id: 'session-1',
     title: 'Test Session',
     status: 'active',
     currentRound: 1,
-    maxRounds: 5,
+    maxParticipants: 200,
+    createdAt: '2023-01-01T00:00:00Z',
+    updatedAt: '2023-01-01T00:00:00Z',
     settings: {
       timeLimit: 30,
       revivalEnabled: true,

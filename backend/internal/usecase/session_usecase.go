@@ -59,6 +59,23 @@ func (u *sessionUseCase) GetSession(ctx context.Context, sessionID string) (*dom
 	return session, nil
 }
 
+func (u *sessionUseCase) ListAvailableSessions(ctx context.Context) ([]*domain.Session, error) {
+	sessions, err := u.sessionRepo.List(ctx, 100, 0) // Get up to 100 sessions
+	if err != nil {
+		return nil, fmt.Errorf("failed to list sessions: %w", err)
+	}
+
+	// Filter to only show waiting and active sessions
+	var availableSessions []*domain.Session
+	for _, session := range sessions {
+		if session.IsWaiting() || session.IsActive() {
+			availableSessions = append(availableSessions, session)
+		}
+	}
+
+	return availableSessions, nil
+}
+
 func (u *sessionUseCase) StartSession(ctx context.Context, sessionID string) error {
 	session, err := u.sessionRepo.GetByID(ctx, sessionID)
 	if err != nil {
@@ -178,4 +195,43 @@ func (u *sessionUseCase) GetActiveParticipants(ctx context.Context, sessionID st
 	}
 
 	return participants, nil
+}
+
+func (u *sessionUseCase) DeleteSession(ctx context.Context, sessionID string) error {
+	if sessionID == "" {
+		return domain.ErrInvalidInput
+	}
+
+	// セッション存在確認
+	session, err := u.sessionRepo.GetByID(ctx, sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to get session: %w", err)
+	}
+
+	// アクティブなセッションは削除不可
+	if session.IsActive() {
+		return domain.ErrInvalidSessionStatus
+	}
+
+	// 関連する参加者データを削除
+	participants, err := u.participantRepo.GetBySession(ctx, sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to get participants: %w", err)
+	}
+
+	for _, participant := range participants {
+		if err := u.participantRepo.Delete(ctx, participant.ID); err != nil {
+			return fmt.Errorf("failed to delete participant: %w", err)
+		}
+	}
+
+	// セッションを削除
+	if err := u.sessionRepo.Delete(ctx, sessionID); err != nil {
+		return fmt.Errorf("failed to delete session: %w", err)
+	}
+
+	// WebSocketで削除通知
+	u.wsManager.NotifySessionDeleted(sessionID)
+
+	return nil
 }

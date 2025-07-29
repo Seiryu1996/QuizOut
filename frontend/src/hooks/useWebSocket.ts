@@ -28,6 +28,7 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
   const {
     setIsConnected: setQuizConnected,
     setCurrentQuestion,
+    addQuestion,
     setTimeRemaining,
     setRoundResults,
     clearRoundResults,
@@ -85,7 +86,7 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
       // クイズ関連イベント
       socket.on('question_start', (data: QuestionStartMessage) => {
         console.log('Question started:', data);
-        setCurrentQuestion({
+        const question = {
           id: data.question.id,
           text: data.question.text,
           options: data.question.options,
@@ -93,7 +94,9 @@ export const useWebSocket = (options: UseWebSocketOptions = {}) => {
           category: data.question.category,
           difficulty: 'medium', // デフォルト値
           createdAt: new Date().toISOString(),
-        });
+        };
+        setCurrentQuestion(question);
+        addQuestion(question); // 問題を蓄積リストに追加
         setTimeRemaining(data.timeLimit);
         clearRoundResults();
       });

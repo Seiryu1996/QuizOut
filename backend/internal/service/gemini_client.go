@@ -28,7 +28,7 @@ func NewGeminiClient(apiKey string) (*GeminiClient, error) {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
-	model := client.GenerativeModel("gemini-pro")
+	model := client.GenerativeModel("gemini-1.5-flash")
 	model.SetTemperature(0.7)
 	model.SetTopK(40)
 	model.SetTopP(0.95)

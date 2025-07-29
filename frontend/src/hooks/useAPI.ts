@@ -11,3 +11,12 @@ export const useAPI = () => {
 
   return apiClient;
 };
+
+// 管理者画面専用のAPI（認証トークンなし、セッションベース認証のみ）
+export const useAdminAPI = () => {
+  const apiClient = useMemo(() => {
+    return createAPIClient(() => null); // トークンなし
+  }, []);
+
+  return apiClient;
+};
