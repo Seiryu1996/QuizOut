@@ -172,6 +172,63 @@ func (h *SessionHandler) JoinSession(c *gin.Context) {
 	utils.SuccessResponse(c, http.StatusCreated, response)
 }
 
+// POST /api/v1/admin/sessions/:id/join (管理者専用)
+func (h *SessionHandler) AdminJoinSession(c *gin.Context) {
+	sessionID := c.Param("id")
+	if sessionID == "" {
+		utils.BadRequestError(c, "Session ID is required")
+		return
+	}
+
+	// セッションベース認証から管理者情報を取得
+	user, exists := c.Get("user")
+	if !exists {
+		utils.UnauthorizedError(c, "Authentication required")
+		return
+	}
+
+	domainUser, ok := user.(*domain.User)
+	if !ok || !domainUser.IsAdmin() {
+		utils.ErrorResponse(c, http.StatusForbidden, "FORBIDDEN", "Admin access required")
+		return
+	}
+
+	var req JoinSessionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequestError(c, "Invalid request body", err.Error())
+		return
+	}
+
+	// 管理者用のIDとして、User.IDを使用
+	userID := domainUser.ID
+
+	participant, err := h.sessionUseCase.JoinSession(c.Request.Context(), sessionID, userID, req.DisplayName)
+	if err != nil {
+		switch err.Error() {
+		case "session not found":
+			utils.NotFoundError(c, "Session not found")
+		case "session is full":
+			utils.ConflictError(c, "Session is full")
+		case "session is not active":
+			utils.ConflictError(c, "Session is not accepting new participants")
+		default:
+			utils.InternalServerError(c, "Failed to join session")
+		}
+		return
+	}
+
+	response := map[string]interface{}{
+		"participantId": participant.ID,
+		"userId":       participant.UserID,
+		"sessionId":    participant.SessionID,
+		"displayName":  participant.DisplayName,
+		"status":       string(participant.Status),
+		"joinedAt":     participant.JoinedAt,
+	}
+
+	utils.SuccessResponse(c, http.StatusCreated, response)
+}
+
 // GET /api/v1/sessions/:id/participants
 func (h *SessionHandler) GetParticipants(c *gin.Context) {
 	sessionID := c.Param("id")

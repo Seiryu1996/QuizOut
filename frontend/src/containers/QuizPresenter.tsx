@@ -247,6 +247,7 @@ export const QuizPresenter: React.FC<QuizPresenterProps> = ({
           game={game}
           participantCount={participants.length}
           connectionStatus={connectionStatus}
+          onGoHome={onGoHome}
           className="mb-6"
         />
 

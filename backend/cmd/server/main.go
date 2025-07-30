@@ -215,6 +215,9 @@ func main() {
 			adminSession.GET("/sessions/:id/current-question", quizHandler.GetAdminCurrentQuestion)
 			adminSession.GET("/sessions/:id/questions", quizHandler.GetAdminAllQuestions)
 
+			// 管理者用セッション参加（セッションベース認証）
+			adminSession.POST("/sessions/:id/join", sessionHandler.AdminJoinSession)
+
 			// クイズ管理
 			adminSession.POST("/sessions/:id/generate-question", quizHandler.GenerateQuestion)
 			adminSession.POST("/sessions/:id/process-results", quizHandler.ProcessRoundResults)
