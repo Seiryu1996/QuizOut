@@ -13,6 +13,8 @@ RUN go mod download
 FROM base AS development
 # airをインストール（ホットリロード用）
 RUN go install github.com/cosmtrek/air@v1.49.0
+# 開発時用の設定ファイルをコピー
+COPY . .
 EXPOSE 8080
 CMD ["air"]
 

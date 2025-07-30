@@ -16,7 +16,9 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// 開発環境でエミュレータに接続
+// エミュレータ設定は現在無効（本番Firebase使用）
+// 本番環境では以下のエミュレータ接続をコメントアウト
+/*
 if (process.env.NODE_ENV === 'development') {
   // ブラウザサイドでのみエミュレータに接続（サーバーサイドでは不要）
   if (typeof window !== 'undefined') {
@@ -35,5 +37,11 @@ if (process.env.NODE_ENV === 'development') {
     }
   }
 }
+*/
+
+console.log('Firebase initialized with production configuration:', {
+  projectId: firebaseConfig.projectId,
+  authDomain: firebaseConfig.authDomain
+});
 
 export default app;

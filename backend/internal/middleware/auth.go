@@ -27,6 +27,7 @@ func (a *AuthMiddleware) RequireAuth() gin.HandlerFunc {
 		// 開発環境でエミュレータを使用している場合は認証をスキップ
 		environment := os.Getenv("ENVIRONMENT")
 		authEmulatorHost := os.Getenv("FIREBASE_AUTH_EMULATOR_HOST")
+		log.Printf("RequireAuth: Environment=%s, AuthEmulatorHost=%s", environment, authEmulatorHost)
 		if (environment == "development" || environment == "") && authEmulatorHost != "" {
 			log.Printf("Development mode with emulator: Skipping auth check")
 			// ダミーのユーザー情報を設定

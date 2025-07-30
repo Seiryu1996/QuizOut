@@ -52,15 +52,8 @@ func (u *quizUseCase) GenerateQuestion(ctx context.Context, sessionID string, ro
 		return nil, domain.ErrSessionNotActive
 	}
 
-	// 管理者が問題生成する場合は、現在のラウンドを自動的に進める
-	if round == session.CurrentRound {
-		// 既存の問題があるかチェック
-		existingQuestion, err := u.questionRepo.GetBySessionAndRound(ctx, sessionID, round)
-		if err == nil && existingQuestion != nil {
-			// 既存の問題がある場合は次のラウンドの問題を生成
-			round = session.CurrentRound + 1
-		}
-	}
+	// 問題を順次蓄積していくため、指定されたラウンドの問題をそのまま生成
+	// 重複チェックは行わず、管理者が明示的に問題を生成できるようにする
 
 	// 難易度をラウンドに応じて自動調整
 	if difficulty == "" {
@@ -103,12 +96,27 @@ func (u *quizUseCase) GetCurrentQuestion(ctx context.Context, sessionID string) 
 		return nil, domain.ErrSessionNotFound
 	}
 
-	question, err := u.questionRepo.GetBySessionAndRound(ctx, sessionID, session.CurrentRound)
+	// 全ての問題を取得して、現在のラウンド以上で最も早いラウンドの問題を取得
+	questions, err := u.questionRepo.GetBySession(ctx, sessionID)
 	if err != nil {
 		return nil, domain.ErrQuestionNotFound
 	}
 
-	return question, nil
+	// 現在のラウンド以上の問題から最も早いものを選択
+	var currentQuestion *domain.Question
+	for _, q := range questions {
+		if q.Round >= session.CurrentRound {
+			if currentQuestion == nil || q.Round < currentQuestion.Round {
+				currentQuestion = q
+			}
+		}
+	}
+
+	if currentQuestion == nil {
+		return nil, domain.ErrQuestionNotFound
+	}
+
+	return currentQuestion, nil
 }
 
 func (u *quizUseCase) GetAllQuestions(ctx context.Context, sessionID string) ([]*domain.Question, error) {
@@ -116,7 +124,7 @@ func (u *quizUseCase) GetAllQuestions(ctx context.Context, sessionID string) ([]
 		return nil, domain.ErrInvalidInput
 	}
 
-	session, err := u.sessionRepo.GetByID(ctx, sessionID)
+	_, err := u.sessionRepo.GetByID(ctx, sessionID)
 	if err != nil {
 		return nil, domain.ErrSessionNotFound
 	}
