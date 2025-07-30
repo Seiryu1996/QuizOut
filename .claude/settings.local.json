@@ -27,7 +27,13 @@
       "Bash(mv:*)",
       "Bash(timeout 10s npm run dev)",
       "Bash(pkill:*)",
-      "Bash(PORT=3002 npm run dev)"
+      "Bash(PORT=3002 npm run dev)",
+      "Bash(-b /tmp/admin_cookies.txt)",
+      "Bash(cat:*)",
+      "Bash(source .env)",
+      "Bash(go run:*)",
+      "Bash(GOOGLE_APPLICATION_CREDENTIALS=/mnt/c/Users/上畑成龍/Desktop/dev/QuizOut/backend/configs/firebase-admin.json node create_user_simple.js)",
+      "Bash(echo:*)"
     ],
     "deny": []
   }

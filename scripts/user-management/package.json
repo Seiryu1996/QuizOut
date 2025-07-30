@@ -1,0 +1,27 @@
+{
+  "name": "@quizout/user-management",
+  "version": "1.0.0",
+  "description": "QuizOut user management scripts for Firebase Firestore",
+  "main": "create-users.js",
+  "scripts": {
+    "create-users": "node create-users.js",
+    "test": "node test-creation.js",
+    "install-deps": "npm install firebase-admin bcrypt dotenv"
+  },
+  "keywords": [
+    "quizout",
+    "firebase",
+    "user-management",
+    "firestore"
+  ],
+  "author": "QuizOut Development Team",
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^5.1.0",
+    "dotenv": "^16.6.1",
+    "firebase-admin": "^12.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -12,8 +12,14 @@ build: ## Build all Docker images
 up: ## Start all services
 	docker-compose up -d
 
+up-prod: ## Start services in production mode
+	docker-compose -f docker-compose.prod.yml up -d
+
 dev: ## Start services in development mode with logs
 	docker-compose up
+
+prod: ## Start services in production mode with logs
+	docker-compose -f docker-compose.prod.yml up
 
 down: ## Stop all services
 	docker-compose down

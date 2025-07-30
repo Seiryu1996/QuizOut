@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"quiz-app/internal/domain"
@@ -36,9 +37,21 @@ func NewFirebaseClient(ctx context.Context, cfg *config.Config) (*FirebaseClient
 		}
 		// エミュレータを使用する場合は認証不要
 		app, err = firebase.NewApp(ctx, firebaseConfig)
-	} else if cfg.Firebase.PrivateKey != "" {
+	} else if cfg.Firebase.PrivateKey != "" && cfg.Firebase.ClientEmail != "" {
 		// 本番環境：サービスアカウントキーを使用
-		opt := option.WithCredentialsJSON([]byte(cfg.Firebase.PrivateKey))
+		serviceAccount := map[string]interface{}{
+			"type":         "service_account",
+			"project_id":   cfg.Firebase.ProjectID,
+			"private_key":  cfg.Firebase.PrivateKey,
+			"client_email": cfg.Firebase.ClientEmail,
+		}
+		
+		serviceAccountJSON, err := json.Marshal(serviceAccount)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal service account: %v", err)
+		}
+		
+		opt := option.WithCredentialsJSON(serviceAccountJSON)
 		firebaseConfig := &firebase.Config{
 			ProjectID: cfg.Firebase.ProjectID,
 		}

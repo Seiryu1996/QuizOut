@@ -108,6 +108,21 @@ class APIClient {
     });
   }
 
+  // Admin version of joinSession
+  async adminJoinSession(sessionId: string, request: JoinSessionRequest): Promise<APIResponse<{
+    participantId: string;
+    userId: string;
+    sessionId: string;
+    displayName: string;
+    status: string;
+    joinedAt: string;
+  }>> {
+    return this.request(`/api/v1/admin/sessions/${sessionId}/join`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
   async getParticipants(sessionId: string): Promise<APIResponse<Participant[]>> {
     return this.request<Participant[]>(`/api/v1/sessions/${sessionId}/participants`);
   }
