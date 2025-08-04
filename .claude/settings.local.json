@@ -33,8 +33,17 @@
       "Bash(source .env)",
       "Bash(go run:*)",
       "Bash(GOOGLE_APPLICATION_CREDENTIALS=/mnt/c/Users/上畑成龍/Desktop/dev/QuizOut/backend/configs/firebase-admin.json node create_user_simple.js)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(-b /tmp/session_cookies.txt)",
+      "mcp__serena__get_symbols_overview",
+      "mcp__serena__list_dir",
+      "mcp__serena__find_file",
+      "mcp__serena__write_memory"
     ],
     "deny": []
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "serena"
+  ]
 }
